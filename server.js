@@ -91,6 +91,108 @@ function getNextTurnPlayer(lobby) {
     return lobby.players[nextIndex].socketId;
 }
 
+function concludeVoting(lobby, lobbyCode) {
+    // Clear timer
+    if (lobby.votingTimer) {
+        clearTimeout(lobby.votingTimer);
+        lobby.votingTimer = null;
+    }
+
+    // Count votes
+    const voteCounts = new Map();
+    lobby.votes.forEach((target) => {
+        voteCounts.set(target, (voteCounts.get(target) || 0) + 1);
+    });
+
+    // Find player with most votes
+    let maxVotes = 0;
+    let votedOut = null;
+    let tie = false;
+
+    voteCounts.forEach((count, socketId) => {
+        if (count > maxVotes) {
+            maxVotes = count;
+            votedOut = socketId;
+            tie = false;
+        } else if (count === maxVotes && maxVotes > 0) {
+            tie = true;
+        }
+    });
+
+    // Handle tie - random selection
+    if (tie) {
+        const tiedPlayers = [];
+        voteCounts.forEach((count, socketId) => {
+            if (count === maxVotes) {
+                tiedPlayers.push(socketId);
+            }
+        });
+        votedOut = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
+    }
+
+    // Handle case where no one voted
+    if (!votedOut && lobby.players.length > 0) {
+        votedOut = lobby.players[Math.floor(Math.random() * lobby.players.length)].socketId;
+    }
+
+    const votedOutPlayer = lobby.players.find(p => p.socketId === votedOut);
+    const imposter = lobby.players.find(p => p.isImposter);
+
+    let imposterWon = true;
+    if (votedOutPlayer && votedOutPlayer.isImposter) {
+        // Imposter was caught
+        imposterWon = false;
+        lobby.players.forEach(p => {
+            if (!p.isImposter) {
+                p.score += 1;
+            }
+        });
+    } else {
+        // Imposter survived
+        if (imposter) {
+            imposter.score += 3;
+        }
+    }
+
+    // Send results
+    io.to(lobbyCode).emit('gameOver', {
+        imposterWon,
+        imposterUsername: imposter ? imposter.username : 'Unknown',
+        votedOutUsername: votedOutPlayer ? votedOutPlayer.username : 'No one',
+        card: lobby.card,
+        players: lobby.players.map(p => ({
+            username: p.username,
+            isHost: p.isHost,
+            score: p.score,
+            socketId: p.socketId,
+            wasImposter: p.isImposter
+        }))
+    });
+
+    // Reset lobby for next round
+    setTimeout(() => {
+        lobby.state = 'waiting';
+        lobby.card = null;
+        lobby.currentTurn = null;
+        lobby.round = 0;
+        lobby.messages = [];
+        lobby.votes = new Map();
+        lobby.players.forEach(p => {
+            p.isImposter = false;
+            p.hasVoted = false;
+        });
+
+        io.to(lobbyCode).emit('backToLobby', {
+            players: lobby.players.map(p => ({
+                username: p.username,
+                isHost: p.isHost,
+                score: p.score,
+                socketId: p.socketId
+            }))
+        });
+    }, 8000);
+}
+
 // Socket.io connection
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -235,7 +337,10 @@ io.on('connection', (socket) => {
         lobby.round = 1;
         lobby.messages = [];
         lobby.votes = new Map();
-        lobby.currentTurn = lobby.players[0].socketId;
+
+        // Random first player
+        const randomPlayerIndex = Math.floor(Math.random() * lobby.players.length);
+        lobby.currentTurn = lobby.players[randomPlayerIndex].socketId;
 
         // Reset player states
         lobby.players.forEach(p => {
@@ -244,6 +349,12 @@ io.on('connection', (socket) => {
 
         // Select imposter
         selectImposter(lobby);
+
+        // Clear any existing voting timer
+        if (lobby.votingTimer) {
+            clearTimeout(lobby.votingTimer);
+            lobby.votingTimer = null;
+        }
 
         // Send game state to each player
         lobby.players.forEach(player => {
@@ -306,6 +417,12 @@ io.on('connection', (socket) => {
                         socketId: p.socketId
                     }))
                 });
+
+                // Start 20 second voting timer
+                lobby.votingTimer = setTimeout(() => {
+                    concludeVoting(lobby, playerInfo.lobbyCode);
+                }, 20000);
+
                 return;
             }
         }
@@ -332,95 +449,30 @@ io.on('connection', (socket) => {
         player.hasVoted = true;
         lobby.votes.set(socket.id, targetSocketId);
 
+        // Send vote update to all players
+        const voteCounts = {};
+        const playersVoted = [];
+
+        lobby.votes.forEach((target, voter) => {
+            voteCounts[target] = (voteCounts[target] || 0) + 1;
+            playersVoted.push(voter);
+        });
+
+        io.to(playerInfo.lobbyCode).emit('voteUpdate', {
+            votes: voteCounts,
+            playersVoted: playersVoted
+        });
+
         // Check if all votes are in
         const allVoted = lobby.players.every(p => p.hasVoted);
         if (allVoted) {
-            // Count votes
-            const voteCounts = new Map();
-            lobby.votes.forEach((target) => {
-                voteCounts.set(target, (voteCounts.get(target) || 0) + 1);
-            });
-
-            // Find player with most votes
-            let maxVotes = 0;
-            let votedOut = null;
-            let tie = false;
-
-            voteCounts.forEach((count, socketId) => {
-                if (count > maxVotes) {
-                    maxVotes = count;
-                    votedOut = socketId;
-                    tie = false;
-                } else if (count === maxVotes) {
-                    tie = true;
-                }
-            });
-
-            // Handle tie - random selection
-            if (tie) {
-                const tiedPlayers = [];
-                voteCounts.forEach((count, socketId) => {
-                    if (count === maxVotes) {
-                        tiedPlayers.push(socketId);
-                    }
-                });
-                votedOut = tiedPlayers[Math.floor(Math.random() * tiedPlayers.length)];
+            // Cancel timer since everyone voted
+            if (lobby.votingTimer) {
+                clearTimeout(lobby.votingTimer);
+                lobby.votingTimer = null;
             }
 
-            const votedOutPlayer = lobby.players.find(p => p.socketId === votedOut);
-            const imposter = lobby.players.find(p => p.isImposter);
-
-            let imposterWon = true;
-            if (votedOutPlayer && votedOutPlayer.isImposter) {
-                // Imposter was caught
-                imposterWon = false;
-                lobby.players.forEach(p => {
-                    if (!p.isImposter) {
-                        p.score += 1;
-                    }
-                });
-            } else {
-                // Imposter survived
-                imposter.score += 3;
-            }
-
-            // Send results
-            io.to(playerInfo.lobbyCode).emit('gameOver', {
-                imposterWon,
-                imposterUsername: imposter.username,
-                votedOutUsername: votedOutPlayer?.username,
-                card: lobby.card,
-                players: lobby.players.map(p => ({
-                    username: p.username,
-                    isHost: p.isHost,
-                    score: p.score,
-                    socketId: p.socketId,
-                    wasImposter: p.isImposter
-                }))
-            });
-
-            // Reset lobby for next round
-            setTimeout(() => {
-                lobby.state = 'waiting';
-                lobby.card = null;
-                lobby.currentTurn = null;
-                lobby.round = 0;
-                lobby.messages = [];
-                lobby.votes = new Map();
-                lobby.players.forEach(p => {
-                    p.isImposter = false;
-                    p.hasVoted = false;
-                });
-
-                io.to(playerInfo.lobbyCode).emit('backToLobby', {
-                    players: lobby.players.map(p => ({
-                        username: p.username,
-                        isHost: p.isHost,
-                        score: p.score,
-                        socketId: p.socketId
-                    }))
-                });
-            }, 8000);
+            concludeVoting(lobby, playerInfo.lobbyCode);
         } else {
             // Notify that vote was received
             socket.emit('voteReceived');

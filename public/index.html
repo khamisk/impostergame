@@ -107,53 +107,56 @@
 
     <!-- Game Screen -->
     <div id="gameScreen" class="screen">
-        <div class="container">
-            <div class="game-header">
-                <h3>Round <span id="currentRound">1</span>/3</h3>
-            </div>
+        <div class="game-container">
+            <!-- Left Sidebar -->
+            <div class="game-sidebar">
+                <!-- Card Display (Top) -->
+                <div class="card-display" id="cardDisplay">
+                    <div class="card-container">
+                        <img id="cardImage" src="" alt="Card">
+                        <p id="cardName" class="card-name"></p>
+                    </div>
+                </div>
 
-            <div class="card-display" id="cardDisplay">
-                <div class="card-container">
-                    <img id="cardImage" src="" alt="Card">
-                    <p id="cardName" class="card-name"></p>
+                <div class="imposter-display" id="imposterDisplay" style="display: none;">
+                    <div class="imposter-card">
+                        <h2>🎭 YOU ARE THE IMPOSTER</h2>
+                        <p>Blend in!</p>
+                    </div>
+                </div>
+
+                <!-- Players List (Below Card) -->
+                <div class="game-players">
+                    <h4>Players</h4>
+                    <div id="gamePlayersList" class="game-players-list"></div>
+                </div>
+
+                <!-- Voting Timer (Shows during voting) -->
+                <div id="votingTimer" class="voting-timer" style="display: none;">
+                    <p>⏱️ Time to vote: <span id="timerSeconds">20</span>s</p>
                 </div>
             </div>
 
-            <div class="imposter-display" id="imposterDisplay" style="display: none;">
-                <div class="imposter-card">
-                    <h2>🎭 YOU ARE THE IMPOSTER</h2>
-                    <p>Blend in and don't get caught!</p>
+            <!-- Right Side - Chat -->
+            <div class="game-chat">
+                <div class="game-header">
+                    <h3>Round <span id="currentRound">1</span>/3</h3>
+                    <div class="turn-info" id="turnInfo">
+                        <p id="turnText">Waiting for turn...</p>
+                    </div>
+                </div>
+
+                <!-- Chat Messages -->
+                <div class="chat-section">
+                    <div id="messagesList" class="messages-list"></div>
+                </div>
+
+                <!-- Message Input -->
+                <div class="message-input" id="messageInputSection" style="display: none;">
+                    <input type="text" id="messageInput" maxlength="20" placeholder="Type 1-2 words about the card...">
+                    <button id="sendMessageBtn" class="btn btn-primary">Send</button>
                 </div>
             </div>
-
-            <div class="game-players">
-                <h4>Players</h4>
-                <div id="gamePlayersList" class="game-players-list"></div>
-            </div>
-
-            <div class="messages-section">
-                <h4>Messages</h4>
-                <div id="messagesList" class="messages-list"></div>
-            </div>
-
-            <div class="turn-info" id="turnInfo">
-                <p id="turnText">Waiting for turn...</p>
-            </div>
-
-            <div class="message-input" id="messageInputSection" style="display: none;">
-                <input type="text" id="messageInput" maxlength="20" placeholder="Type 1-2 words about the card...">
-                <button id="sendMessageBtn" class="btn btn-primary">Send</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Voting Screen -->
-    <div id="votingScreen" class="screen">
-        <div class="container">
-            <h2>🗳️ VOTE FOR THE IMPOSTER</h2>
-            <p class="voting-instruction">Click on a player's name to vote them out!</p>
-
-            <div id="votingPlayersList" class="voting-players-list"></div>
         </div>
     </div>
 

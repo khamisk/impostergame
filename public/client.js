@@ -5,13 +5,15 @@ let currentScreen = 'mainMenu';
 let currentLobbyCode = null;
 let mySocketId = null;
 let isHost = false;
+let isVotingPhase = false;
+let votingTimer = null;
+let votingTimeLeft = 20;
 
 // DOM Elements
 const screens = {
     mainMenu: document.getElementById('mainMenu'),
     lobbyScreen: document.getElementById('lobbyScreen'),
     gameScreen: document.getElementById('gameScreen'),
-    votingScreen: document.getElementById('votingScreen'),
     gameOverScreen: document.getElementById('gameOverScreen')
 };
 
@@ -263,33 +265,31 @@ socket.on('messageReceived', ({ messages, currentTurn, round }) => {
 });
 
 socket.on('votingPhase', ({ players }) => {
-    showScreen('votingScreen');
+    isVotingPhase = true;
+    votingTimeLeft = 20;
 
-    const votingPlayersList = document.getElementById('votingPlayersList');
-    votingPlayersList.innerHTML = players.map(p => `
-        <button class="vote-btn" data-socket-id="${p.socketId}">
-            ${escapeHtml(p.username)}
-        </button>
-    `).join('');
+    // Hide message input
+    document.getElementById('messageInputSection').style.display = 'none';
 
-    // Add vote button listeners
-    document.querySelectorAll('.vote-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetSocketId = btn.dataset.socketId;
+    // Update turn info
+    document.getElementById('turnText').textContent = '🗳️ Vote for the imposter!';
+    document.getElementById('turnInfo').classList.remove('my-turn');
 
-            // Show confirmation
-            const confirmVote = confirm(`Vote for ${btn.textContent.trim()}?`);
-            if (confirmVote) {
-                socket.emit('submitVote', { targetSocketId });
-                btn.classList.add('voted');
-                btn.disabled = true;
-                document.querySelectorAll('.vote-btn').forEach(b => b.disabled = true);
-                showToast('Vote submitted!', 'success');
-            }
-        });
-    });
+    // Show voting timer
+    const votingTimer = document.getElementById('votingTimer');
+    votingTimer.style.display = 'block';
 
-    showToast('Time to vote!', 'info');
+    // Start countdown
+    startVotingTimer();
+
+    // Update player list to enable voting
+    updatePlayersListForVoting(players);
+
+    showToast('Time to vote! Click a player name.', 'info');
+});
+
+socket.on('voteUpdate', ({ votes, playersVoted }) => {
+    updateVoteCounts(votes, playersVoted);
 });
 
 socket.on('voteReceived', () => {
@@ -297,6 +297,14 @@ socket.on('voteReceived', () => {
 });
 
 socket.on('gameOver', ({ imposterWon, imposterUsername, votedOutUsername, card, players }) => {
+    // Clean up voting state
+    isVotingPhase = false;
+    if (votingTimer) {
+        clearInterval(votingTimer);
+        votingTimer = null;
+    }
+    document.getElementById('votingTimer').style.display = 'none';
+
     showScreen('gameOverScreen');
 
     const gameOverContent = document.getElementById('gameOverContent');
@@ -330,6 +338,10 @@ socket.on('gameOver', ({ imposterWon, imposterUsername, votedOutUsername, card, 
 });
 
 socket.on('backToLobby', ({ players }) => {
+    // Reset voting state
+    isVotingPhase = false;
+    votingTimeLeft = 20;
+
     showScreen('lobbyScreen');
     updatePlayersList(players);
     showToast('Ready for next round!', 'info');
@@ -408,6 +420,94 @@ function updateTurnDisplay(currentTurn, players) {
         turnInfo.classList.remove('my-turn');
         messageInputSection.style.display = 'none';
     }
+}
+
+function startVotingTimer() {
+    const timerElement = document.getElementById('timerSeconds');
+
+    if (votingTimer) clearInterval(votingTimer);
+
+    votingTimer = setInterval(() => {
+        votingTimeLeft--;
+        timerElement.textContent = votingTimeLeft;
+
+        if (votingTimeLeft <= 0) {
+            clearInterval(votingTimer);
+            // Time's up - server will handle this
+        }
+    }, 1000);
+}
+
+function updatePlayersListForVoting(players) {
+    const gamePlayersList = document.getElementById('gamePlayersList');
+
+    gamePlayersList.innerHTML = players.map(p => {
+        const isMe = p.socketId === mySocketId;
+        return `
+            <div class="game-player-item voting-mode" data-socket-id="${p.socketId}">
+                <div class="player-info">
+                    <span>${escapeHtml(p.username)}${isMe ? ' (You)' : ''}</span>
+                </div>
+                <div class="player-status">
+                    <span class="vote-count" style="display: none;">0</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click listeners for voting
+    document.querySelectorAll('.game-player-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const targetSocketId = item.dataset.socketId;
+            const username = item.querySelector('.player-info span').textContent;
+
+            // Visual confirmation - change color
+            document.querySelectorAll('.game-player-item').forEach(i => {
+                i.classList.remove('my-vote');
+            });
+            item.classList.add('my-vote');
+
+            // Submit vote
+            socket.emit('submitVote', { targetSocketId });
+
+            // Disable further voting for this player
+            document.querySelectorAll('.game-player-item').forEach(i => {
+                i.style.pointerEvents = 'none';
+            });
+
+            showToast(`Voted for ${username}`, 'success');
+        });
+    });
+}
+
+function updateVoteCounts(votes, playersVoted) {
+    // Update vote counts
+    document.querySelectorAll('.game-player-item').forEach(item => {
+        const socketId = item.dataset.socketId;
+        const voteCount = votes[socketId] || 0;
+        const voteCountElement = item.querySelector('.vote-count');
+
+        if (voteCount > 0) {
+            voteCountElement.textContent = voteCount;
+            voteCountElement.style.display = 'inline-block';
+        } else {
+            voteCountElement.style.display = 'none';
+        }
+    });
+
+    // Update who has voted (checkmarks)
+    playersVoted.forEach(socketId => {
+        const playerItem = document.querySelector(`.game-player-item[data-socket-id="${socketId}"]`);
+        if (playerItem) {
+            const playerStatus = playerItem.querySelector('.player-status');
+            if (!playerStatus.querySelector('.has-voted-badge')) {
+                const badge = document.createElement('span');
+                badge.className = 'has-voted-badge';
+                badge.textContent = '✓';
+                playerStatus.insertBefore(badge, playerStatus.firstChild);
+            }
+        }
+    });
 }
 
 function escapeHtml(text) {
