@@ -5,12 +5,25 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+
+// Configure Socket.io with CORS for Railway
+const io = socketIo(server, {
+    cors: {
+        origin: "*", // Allow all origins (you can restrict this to your Railway domain later)
+        methods: ["GET", "POST"]
+    },
+    transports: ['websocket', 'polling'] // Support both for Railway
+});
 
 const PORT = process.env.PORT || 3000;
 
 // Serve static files
 app.use(express.static('public'));
+
+// Health check endpoint for Railway
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
 
 // Game state
 const lobbies = new Map();
@@ -469,6 +482,8 @@ function getLobbyData(lobby, socketId) {
     };
 }
 
-server.listen(PORT, () => {
+// Start server - bind to 0.0.0.0 for Railway
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
