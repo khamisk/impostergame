@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clash Royale Imposter Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Main Menu Screen -->
+    <div id="mainMenu" class="screen active">
+        <div class="container">
+            <h1 class="game-title">🎮 GUESS THE IMPOSTER</h1>
+            <p class="subtitle">Clash Royale Edition</p>
+
+            <div class="menu-buttons">
+                <button id="createLobbyBtn" class="btn btn-primary">Create Lobby</button>
+                <button id="refreshLobbiesBtn" class="btn btn-secondary">Refresh Lobbies</button>
+            </div>
+
+            <div class="lobbies-section">
+                <h2>Available Lobbies</h2>
+                <div id="lobbiesList" class="lobbies-list">
+                    <p class="no-lobbies">No public lobbies available. Create one!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Lobby Modal -->
+    <div id="createLobbyModal" class="modal">
+        <div class="modal-content">
+            <h2>Create Lobby</h2>
+            <form id="createLobbyForm">
+                <div class="form-group">
+                    <label for="lobbyNameInput">Lobby Name:</label>
+                    <input type="text" id="lobbyNameInput" maxlength="30" required>
+                </div>
+                <div class="form-group">
+                    <label for="usernameCreateInput">Your Username:</label>
+                    <input type="text" id="usernameCreateInput" maxlength="20" required>
+                </div>
+                <div class="form-group">
+                    <label for="passwordInput">Password (optional):</label>
+                    <input type="password" id="passwordInput" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="maxPlayersInput">Max Players:</label>
+                    <select id="maxPlayersInput">
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5" selected>5</option>
+                    </select>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">Create</button>
+                    <button type="button" id="cancelCreateBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Join Lobby Modal -->
+    <div id="joinLobbyModal" class="modal">
+        <div class="modal-content">
+            <h2>Join Lobby</h2>
+            <p id="joinLobbyName" class="lobby-name-display"></p>
+            <form id="joinLobbyForm">
+                <input type="hidden" id="joinLobbyCode">
+                <div class="form-group">
+                    <label for="usernameJoinInput">Your Username:</label>
+                    <input type="text" id="usernameJoinInput" maxlength="20" required>
+                </div>
+                <div class="form-group" id="joinPasswordGroup" style="display: none;">
+                    <label for="joinPasswordInput">Password:</label>
+                    <input type="password" id="joinPasswordInput" maxlength="20">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">Join</button>
+                    <button type="button" id="cancelJoinBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobbyScreen" class="screen">
+        <div class="container">
+            <div class="lobby-header">
+                <h2 id="lobbyTitle">Lobby</h2>
+                <p id="lobbyCode" class="lobby-code"></p>
+            </div>
+
+            <div class="players-section">
+                <h3>Players (<span id="playerCount">0</span>/<span id="maxPlayerCount">5</span>)</h3>
+                <div id="playersList" class="players-list"></div>
+            </div>
+
+            <div class="lobby-actions">
+                <button id="startGameBtn" class="btn btn-primary" style="display: none;">Start Game</button>
+                <button id="leaveLobbyBtn" class="btn btn-secondary">Leave Lobby</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+        <div class="container">
+            <div class="game-header">
+                <h3>Round <span id="currentRound">1</span>/3</h3>
+            </div>
+
+            <div class="card-display" id="cardDisplay">
+                <div class="card-container">
+                    <img id="cardImage" src="" alt="Card">
+                    <p id="cardName" class="card-name"></p>
+                </div>
+            </div>
+
+            <div class="imposter-display" id="imposterDisplay" style="display: none;">
+                <div class="imposter-card">
+                    <h2>🎭 YOU ARE THE IMPOSTER</h2>
+                    <p>Blend in and don't get caught!</p>
+                </div>
+            </div>
+
+            <div class="game-players">
+                <h4>Players</h4>
+                <div id="gamePlayersList" class="game-players-list"></div>
+            </div>
+
+            <div class="messages-section">
+                <h4>Messages</h4>
+                <div id="messagesList" class="messages-list"></div>
+            </div>
+
+            <div class="turn-info" id="turnInfo">
+                <p id="turnText">Waiting for turn...</p>
+            </div>
+
+            <div class="message-input" id="messageInputSection" style="display: none;">
+                <input type="text" id="messageInput" maxlength="20" placeholder="Type 1-2 words about the card...">
+                <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voting Screen -->
+    <div id="votingScreen" class="screen">
+        <div class="container">
+            <h2>🗳️ VOTE FOR THE IMPOSTER</h2>
+            <p class="voting-instruction">Click on a player's name to vote them out!</p>
+
+            <div id="votingPlayersList" class="voting-players-list"></div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" class="screen">
+        <div class="container">
+            <div id="gameOverContent" class="game-over-content"></div>
+
+            <div class="game-over-card">
+                <p class="reveal-text">The card was:</p>
+                <div class="reveal-card-container">
+                    <img id="revealCardImage" src="" alt="Card">
+                    <p id="revealCardName" class="card-name"></p>
+                </div>
+            </div>
+
+            <div class="final-scores">
+                <h3>Scores</h3>
+                <div id="finalScoresList"></div>
+            </div>
+
+            <p class="returning-text">Returning to lobby in a few seconds...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+
+</html>
