@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .login-btn:hover {
+            background: #5568d3;
+        }
+
+        .error-message {
+            color: #f44336;
+            margin-top: 15px;
+            text-align: center;
+            display: none;
+        }
+
+        .dashboard {
+            display: none;
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #667eea;
+        }
+
+        .logout-btn {
+            background: #f44336;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            color: #999;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            color: #667eea;
+            font-weight: 700;
+        }
+
+        .stat-subtitle {
+            color: #999;
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            height: 400px;
+        }
+
+        .chart-container h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: calc(100% - 40px);
+        }
+
+        .sessions-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .sessions-container h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+
+        .session-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .session-item:last-child {
+            border-bottom: none;
+        }
+
+        .session-label {
+            color: #999;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .session-value {
+            color: #333;
+            word-break: break-all;
+        }
+
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+            margin-right: 10px;
+        }
+
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+
+        .clear-btn {
+            background: #FF9800;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .clear-btn:hover {
+            background: #e68900;
+        }
+
+        .actions {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .session-item {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-value {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-box">
+            <h1>🎮 Admin Analytics</h1>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="tokenInput">Admin Token:</label>
+                    <input type="password" id="tokenInput" required placeholder="Enter your admin token">
+                </div>
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+            <div id="errorMessage" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="header">
+            <h1>📊 Analytics Dashboard</h1>
+            <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+
+        <div class="container">
+            <div class="actions">
+                <button id="refreshBtn" class="refresh-btn">🔄 Refresh Data</button>
+                <button id="clearBtn" class="clear-btn">🗑️ Clear Analytics</button>
+            </div>
+
+            <div id="statsGrid" class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Visits</h3>
+                    <div class="stat-value" id="totalVisits">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Active Sessions</h3>
+                    <div class="stat-value" id="activeCount">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Unique Visitors</h3>
+                    <div class="stat-value" id="uniqueVisitors">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Session Time</h3>
+                    <div class="stat-value" id="avgSessionTime">-</div>
+                    <div class="stat-subtitle" id="avgSessionTimeMs"></div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>Browsers</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="browserChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h3>Platforms</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="platformChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sessions-container">
+                <h3>Recent Sessions</h3>
+                <div id="sessionsList" class="sessions-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let adminToken = null;
+        let browserChart = null;
+        let platformChart = null;
+
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const token = document.getElementById('tokenInput').value;
+            adminToken = token;
+            loadDashboard();
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            adminToken = null;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('tokenInput').value = '';
+        });
+
+        // Refresh
+        document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+
+        // Clear analytics
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all analytics? This cannot be undone.')) {
+                fetch('/admin/analytics/clear', {
+                    method: 'POST',
+                    headers: { 'x-admin-token': adminToken }
+                })
+                    .then(res => res.json())
+                    .then(() => {
+                        alert('Analytics cleared');
+                        loadDashboard();
+                    })
+                    .catch(err => alert('Error: ' + err));
+            }
+        });
+
+        async function loadDashboard() {
+            try {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('dashboard').classList.add('active');
+
+                const response = await fetch('/admin/analytics', {
+                    headers: { 'x-admin-token': adminToken }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Invalid token');
+                }
+
+                const data = await response.json();
+                updateStats(data);
+                updateCharts(data);
+                loadSessions();
+            } catch (err) {
+                adminToken = null;
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('dashboard').classList.remove('active');
+                document.getElementById('errorMessage').textContent = 'Invalid token. Please try again.';
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('totalVisits').textContent = data.totalVisits;
+            document.getElementById('activeCount').textContent = data.activeCount;
+            document.getElementById('uniqueVisitors').textContent = data.uniqueVisitors;
+            document.getElementById('avgSessionTime').textContent = data.avgSessionTimeReadable;
+            document.getElementById('avgSessionTimeMs').textContent = `${Math.round(data.avgSessionTimeMs / 1000)}s`;
+        }
+
+        function updateCharts(data) {
+            // Browser chart
+            const browserCtx = document.getElementById('browserChart').getContext('2d');
+            if (browserChart) browserChart.destroy();
+            browserChart = new Chart(browserCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data.browsers),
+                    datasets: [{
+                        data: Object.values(data.browsers),
+                        backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'],
+                        borderColor: white,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Platform chart
+            const platformCtx = document.getElementById('platformChart').getContext('2d');
+            if (platformChart) platformChart.destroy();
+            platformChart = new Chart(platformCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data.platforms),
+                    datasets: [{
+                        data: Object.values(data.platforms),
+                        backgroundColor: ['#FF9800', '#2196F3', '#4CAF50', '#FF5722', '#9C27B0'],
+                        borderColor: white,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        async function loadSessions() {
+            try {
+                const response = await fetch('/admin/analytics/sessions?limit=20', {
+                    headers: { 'x-admin-token': adminToken }
+                });
+
+                const data = await response.json();
+                const sessionsList = document.getElementById('sessionsList');
+
+                if (data.sessions.length === 0) {
+                    sessionsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No sessions yet</p>';
+                    return;
+                }
+
+                sessionsList.innerHTML = data.sessions.map(s => `
+                    <div class="session-item">
+                        <div>
+                            <div class="session-label">Start Time</div>
+                            <div class="session-value">${new Date(s.startTime).toLocaleString()}</div>
+                        </div>
+                        <div>
+                            <div class="session-label">Duration</div>
+                            <div class="session-value">${s.durationReadable}</div>
+                        </div>
+                        <div>
+                            <div class="session-label">IP Address</div>
+                            <div class="session-value">${s.ip}</div>
+                        </div>
+                        <div>
+                            <div class="session-label">User Agent</div>
+                            <div class="session-value">${s.userAgent.substring(0, 50)}...</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error loading sessions:', err);
+            }
+        }
+
+        // Load dashboard on page load if token is in URL
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get('token');
+        if (urlToken) {
+            document.getElementById('tokenInput').value = urlToken;
+            adminToken = urlToken;
+            setTimeout(() => loadDashboard(), 100);
+        }
+    </script>
+</body>
+
+</html>

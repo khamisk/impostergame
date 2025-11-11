@@ -27,6 +27,11 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
+// Admin dashboard
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
 // Analytics System (Admin Only)
 const ANALYTICS_FILE = path.join(__dirname, 'analytics.json');
 const activeSessions = new Map();
