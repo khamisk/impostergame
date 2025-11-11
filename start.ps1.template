@@ -1,0 +1,28 @@
+#!/usr/bin/env pwsh
+# Start the Imposter Game server with admin analytics
+
+Write-Host ""
+Write-Host "🎮 Starting Imposter Game Server..." -ForegroundColor Cyan
+Write-Host "📊 Admin Dashboard: http://localhost:3000/admin" -ForegroundColor Green
+Write-Host ""
+
+# Read token from .env file
+$token = ""
+if (Test-Path ".env") {
+    $envContent = Get-Content ".env" | Where-Object { $_ -match "^ADMIN_TOKEN=" }
+    if ($envContent) {
+        $token = $envContent.Split('=')[1]
+        Write-Host "Your Admin Token: $token" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Quick Login URL:" -ForegroundColor Cyan
+        Write-Host "http://localhost:3000/admin?token=$token" -ForegroundColor Green
+    }
+} else {
+    Write-Host "⚠️  .env file not found! Create one with ADMIN_TOKEN=your_token" -ForegroundColor Red
+}
+
+Write-Host ""
+Write-Host "Starting server..." -ForegroundColor Gray
+Write-Host ""
+
+node server.js

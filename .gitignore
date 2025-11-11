@@ -3,3 +3,9 @@ node_modules/
 *.log
 .DS_Store
 analytics.json
+
+# Private admin documentation with tokens
+ADMIN_QUICK_START.md
+ADMIN_SETUP.md
+start.ps1
+start.sh
