@@ -496,16 +496,22 @@ function concludeVoting(lobby, lobbyCode) {
 
     // Reset lobby for next round
     setTimeout(() => {
+        // Remove players who left during the game
+        lobby.players = lobby.players.filter(p => !p.hasLeft);
+
         lobby.state = 'waiting';
         lobby.card = null;
         lobby.currentTurn = null;
         lobby.round = 0;
         lobby.messages = [];
         lobby.votes = new Map();
+
+        // Reset player states for next game
         lobby.players.forEach(p => {
             p.isImposter = false;
             p.hasVoted = false;
             p.isSpectator = false; // Spectators become active players for next game
+            p.hasLeft = false; // Clear any remaining hasLeft flags
         });
 
         io.to(lobbyCode).emit('backToLobby', {

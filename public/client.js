@@ -425,23 +425,38 @@ socket.on('messageReceived', ({ messages, currentTurn, round, totalRounds }) => 
     console.log('📨 messageReceived:', { messagesCount: messages.length, currentTurn, round, mySocketId });
 
     const roundsText = totalRounds || 3;
-    document.querySelector('.game-header h3').textContent = `Round ${round}/${roundsText}`;
-    document.getElementById('currentRound').textContent = round;
+    const gameHeader = document.querySelector('.game-header h3');
+    const currentRoundEl = document.getElementById('currentRound');
+
+    if (gameHeader) {
+        gameHeader.textContent = `Round ${round}/${roundsText}`;
+    }
+    if (currentRoundEl) {
+        currentRoundEl.textContent = round;
+    }
 
     // Update guess messages list
     const guessMessagesList = document.getElementById('guessMessagesList');
-    guessMessagesList.innerHTML = messages.map(m => `
-        <div class="guess-message-item">
-            <strong>${escapeHtml(m.username)}:</strong> ${escapeHtml(m.message)}
-            <span class="round-badge">R${m.round}</span>
-        </div>
-    `).join('');
+    if (guessMessagesList) {
+        guessMessagesList.innerHTML = messages.map(m => `
+            <div class="guess-message-item">
+                <strong>${escapeHtml(m.username)}:</strong> ${escapeHtml(m.message)}
+                <span class="round-badge">R${m.round}</span>
+            </div>
+        `).join('');
 
-    // Scroll to bottom
-    guessMessagesList.scrollTop = guessMessagesList.scrollHeight;
+        // Scroll to bottom
+        guessMessagesList.scrollTop = guessMessagesList.scrollHeight;
+    } else {
+        console.error('❌ guessMessagesList element not found!');
+    }
 
     // Update turn using stored players
-    updateTurnDisplay(currentTurn, currentPlayers);
+    if (currentPlayers && currentPlayers.length > 0) {
+        updateTurnDisplay(currentTurn, currentPlayers);
+    } else {
+        console.error('❌ currentPlayers is empty or undefined:', currentPlayers);
+    }
 });
 
 socket.on('votingPhase', ({ players }) => {
