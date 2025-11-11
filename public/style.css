@@ -208,6 +208,31 @@ body {
     margin: 3px 0;
 }
 
+.lobby-status {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.lobby-status.waiting {
+    background: #FFF3CD;
+    color: #856404;
+}
+
+.lobby-status.playing {
+    background: #D4EDDA;
+    color: #155724;
+}
+
+.lobby-status.voting {
+    background: #D1ECF1;
+    color: #0C5460;
+}
+
 /* Modal */
 .modal {
     display: none;

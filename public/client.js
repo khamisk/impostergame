@@ -191,11 +191,14 @@ document.getElementById('sendMessageBtn').addEventListener('click', () => {
     const messageInput = document.getElementById('messageInput');
     const message = messageInput.value.trim();
 
+    console.log('🎮 Send button clicked, message:', message);
+
     if (!message) {
         showToast('Please enter a message', 'error');
         return;
     }
 
+    console.log('📤 Emitting submitMessage:', { message });
     socket.emit('submitMessage', { message });
     messageInput.value = '';
 });
@@ -238,17 +241,35 @@ socket.on('lobbyList', (lobbies) => {
         return;
     }
 
-    lobbiesList.innerHTML = lobbies.map(lobby => `
-        <div class="lobby-item">
-            <div class="lobby-info">
-                <h3>${escapeHtml(lobby.name)}</h3>
-                <p>Host: ${escapeHtml(lobby.host)}</p>
-                <p>Players: ${lobby.players}/${lobby.maxPlayers}</p>
-                <p>Code: ${lobby.code}</p>
+    lobbiesList.innerHTML = lobbies.map(lobby => {
+        let statusBadge = '';
+        let buttonText = 'Join';
+        let buttonClass = 'btn btn-primary';
+
+        if (lobby.state === 'playing') {
+            statusBadge = '<span class="lobby-status playing">🎮 In Game</span>';
+            buttonText = 'Spectate';
+            buttonClass = 'btn btn-secondary';
+        } else if (lobby.state === 'voting') {
+            statusBadge = '<span class="lobby-status voting">🗳️ Voting</span>';
+            buttonText = 'Spectate';
+            buttonClass = 'btn btn-secondary';
+        } else {
+            statusBadge = '<span class="lobby-status waiting">⏳ Waiting</span>';
+        }
+
+        return `
+            <div class="lobby-item">
+                <div class="lobby-info">
+                    <h3>${escapeHtml(lobby.name)} ${statusBadge}</h3>
+                    <p>Host: ${escapeHtml(lobby.host)}</p>
+                    <p>Players: ${lobby.players}/${lobby.maxPlayers}</p>
+                    <p>Code: ${lobby.code}</p>
+                </div>
+                <button class="${buttonClass} join-lobby-btn" data-code="${lobby.code}" data-name="${escapeHtml(lobby.name)}">${buttonText}</button>
             </div>
-            <button class="btn btn-primary join-lobby-btn" data-code="${lobby.code}" data-name="${escapeHtml(lobby.name)}">Join</button>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     // Add event listeners to join buttons
     document.querySelectorAll('.join-lobby-btn').forEach(btn => {
@@ -390,6 +411,8 @@ socket.on('gameStarted', ({ isImposter, isSpectator, card, currentTurn, round, p
 });
 
 socket.on('messageReceived', ({ messages, currentTurn, round, totalRounds }) => {
+    console.log('📨 messageReceived:', { messagesCount: messages.length, currentTurn, round, mySocketId });
+
     const roundsText = totalRounds || 3;
     document.querySelector('.game-header h3').textContent = `Round ${round}/${roundsText}`;
     document.getElementById('currentRound').textContent = round;

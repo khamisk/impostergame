@@ -295,13 +295,16 @@ function generateLobbyCode() {
 function getPublicLobbies() {
     const publicLobbies = [];
     lobbies.forEach((lobby, code) => {
-        if (!lobby.password && lobby.state === 'waiting') {
+        if (!lobby.password) {
+            // Show all public lobbies, including ongoing games
             publicLobbies.push({
                 code: lobby.code,
                 name: lobby.name,
                 players: lobby.players.length,
                 maxPlayers: lobby.maxPlayers,
-                host: lobby.players.find(p => p.isHost)?.username || 'Unknown'
+                host: lobby.players.find(p => p.isHost)?.username || 'Unknown',
+                state: lobby.state, // 'waiting', 'playing', 'voting'
+                spectatable: lobby.state === 'playing' || lobby.state === 'voting'
             });
         }
     });
@@ -613,13 +616,11 @@ io.on('connection', (socket) => {
             return;
         }
 
-        if (lobby.players.length >= lobby.maxPlayers) {
-            socket.emit('error', { message: 'Lobby is full' });
-            return;
-        }
+        // Check if game is in progress - allow spectating
+        const isGameInProgress = lobby.state === 'playing' || lobby.state === 'voting';
 
-        if (lobby.state !== 'waiting') {
-            socket.emit('error', { message: 'Game already in progress' });
+        if (!isGameInProgress && lobby.players.length >= lobby.maxPlayers) {
+            socket.emit('error', { message: 'Lobby is full' });
             return;
         }
 
@@ -630,7 +631,7 @@ io.on('connection', (socket) => {
             isImposter: false,
             score: 0,
             hasVoted: false,
-            isSpectator: lobby.state === 'playing' || lobby.state === 'voting' // Spectator if game in progress
+            isSpectator: isGameInProgress // Spectator if game in progress
         };
 
         lobby.players.push(player);
@@ -768,20 +769,39 @@ io.on('connection', (socket) => {
 
     // Submit message
     socket.on('submitMessage', ({ message }) => {
+        console.log('📨 submitMessage received:', { socketId: socket.id, message });
+
         const playerInfo = players.get(socket.id);
-        if (!playerInfo) return;
+        if (!playerInfo) {
+            console.log('❌ No player info found');
+            return;
+        }
 
         const lobby = lobbies.get(playerInfo.lobbyCode);
-        if (!lobby || lobby.state !== 'playing') return;
+        if (!lobby || lobby.state !== 'playing') {
+            console.log('❌ No lobby or not playing:', { lobbyExists: !!lobby, state: lobby?.state });
+            return;
+        }
 
-        if (lobby.currentTurn !== socket.id) return;
+        if (lobby.currentTurn !== socket.id) {
+            console.log('❌ Not player\'s turn:', { currentTurn: lobby.currentTurn, socketId: socket.id });
+            return;
+        }
 
         const player = lobby.players.find(p => p.socketId === socket.id);
-        if (!player) return;
+        if (!player) {
+            console.log('❌ Player not found in lobby');
+            return;
+        }
 
         // Trim and validate message (max 20 characters)
         const trimmedMessage = message.trim().substring(0, 20);
-        if (!trimmedMessage) return;
+        if (!trimmedMessage) {
+            console.log('❌ Empty message');
+            return;
+        }
+
+        console.log('✅ Message valid, processing...');
 
         // Clear turn timer since player submitted
         if (lobby.turnTimer) {
@@ -796,11 +816,15 @@ io.on('connection', (socket) => {
         });
 
         // Move to next turn
-        lobby.currentTurn = getNextTurnPlayer(lobby);
+        const nextTurn = getNextTurnPlayer(lobby);
+        console.log('🔄 Next turn:', nextTurn);
+        lobby.currentTurn = nextTurn;
 
         // Check if round is complete (count only active players)
         const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
         const activePlayers = lobby.players.filter(p => !p.hasLeft);
+        console.log('📊 Round status:', { messagesThisRound, activePlayers: activePlayers.length, round: lobby.round });
+
         if (messagesThisRound === activePlayers.length) {
             if (lobby.round < (lobby.totalRounds || 3)) {
                 // Start next round
@@ -834,6 +858,11 @@ io.on('connection', (socket) => {
         }
 
         // Send updated game state
+        console.log('📤 Emitting messageReceived:', {
+            messagesCount: lobby.messages.length,
+            currentTurn: lobby.currentTurn,
+            round: lobby.round
+        });
         io.to(playerInfo.lobbyCode).emit('messageReceived', {
             messages: lobby.messages,
             currentTurn: lobby.currentTurn,
