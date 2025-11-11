@@ -781,28 +781,48 @@ io.on('connection', (socket) => {
 
     // Submit message
     socket.on('submitMessage', ({ message }) => {
-        console.log('📨 submitMessage received:', { socketId: socket.id, message });
+        console.log('================== SUBMIT MESSAGE ==================');
+        console.log('📨 Received from socket:', socket.id);
+        console.log('   Message content:', message);
 
         const playerInfo = players.get(socket.id);
         if (!playerInfo) {
-            console.log('❌ No player info found');
+            console.log('❌ FAIL: No player info found for socket:', socket.id);
+            console.log('   Available players:', Array.from(players.keys()));
             return;
         }
+        console.log('✅ Player info found:', playerInfo);
 
         const lobby = lobbies.get(playerInfo.lobbyCode);
-        if (!lobby || lobby.state !== 'playing') {
-            console.log('❌ No lobby or not playing:', { lobbyExists: !!lobby, state: lobby?.state });
+        if (!lobby) {
+            console.log('❌ FAIL: No lobby found for code:', playerInfo.lobbyCode);
             return;
         }
+        if (lobby.state !== 'playing') {
+            console.log('❌ FAIL: Lobby not in playing state. Current state:', lobby.state);
+            return;
+        }
+        console.log('✅ Lobby is in playing state');
+
+        console.log('   Current turn:', lobby.currentTurn);
+        console.log('   This socket:', socket.id);
+        console.log('   Match?:', lobby.currentTurn === socket.id);
 
         if (lobby.currentTurn !== socket.id) {
-            console.log('❌ Not player\'s turn:', { currentTurn: lobby.currentTurn, socketId: socket.id });
+            console.log('❌ FAIL: Not this player\'s turn!');
             return;
         }
+        console.log('✅ It is this player\'s turn');
 
         const player = lobby.players.find(p => p.socketId === socket.id);
         if (!player) {
             console.log('❌ Player not found in lobby');
+            return;
+        }
+
+        // Check if player is spectator or has left
+        if (player.isSpectator || player.hasLeft) {
+            console.log('❌ Player is spectator or has left:', { isSpectator: player.isSpectator, hasLeft: player.hasLeft });
             return;
         }
 
