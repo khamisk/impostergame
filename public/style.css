@@ -710,11 +710,12 @@ body {
 
 /* Dual Chat System */
 .guess-chat-section {
-    flex: 0 0 45%;
+    flex: 1;
     display: flex;
     flex-direction: column;
     border-bottom: 3px solid #667eea;
     background: #f0f4ff;
+    min-height: 0;
 }
 
 .guess-chat-header {
@@ -722,6 +723,7 @@ body {
     color: white;
     padding: 12px 15px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .guess-chat-header h4 {
@@ -737,13 +739,33 @@ body {
 
 .guess-messages-list {
     flex: 1;
-    padding: 15px;
+    padding: 12px;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    min-height: 200px;
-    max-height: 300px;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #667eea #e8eeff;
+}
+
+.guess-messages-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.guess-messages-list::-webkit-scrollbar-track {
+    background: #e8eeff;
+    border-radius: 4px;
+}
+
+.guess-messages-list::-webkit-scrollbar-thumb {
+    background: #667eea;
+    border-radius: 4px;
+}
+
+.guess-messages-list::-webkit-scrollbar-thumb:hover {
+    background: #5568d3;
 }
 
 .guess-message-item {
@@ -752,6 +774,8 @@ body {
     border-left: 4px solid #667eea;
     border-radius: 6px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+    word-wrap: break-word;
 }
 
 .guess-message-item strong {
@@ -817,10 +841,11 @@ body {
 
 /* All Chat Section */
 .all-chat-section {
-    flex: 1;
+    flex: 0 0 35%;
     display: flex;
     flex-direction: column;
     background: #fff8f0;
+    min-height: 0;
 }
 
 .all-chat-header {
@@ -828,6 +853,7 @@ body {
     color: white;
     padding: 12px 15px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .all-chat-header h4 {
@@ -843,11 +869,33 @@ body {
 
 .all-chat-list {
     flex: 1;
-    padding: 15px;
+    padding: 12px;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #FF9800 #fff0e0;
+}
+
+.all-chat-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.all-chat-list::-webkit-scrollbar-track {
+    background: #fff0e0;
+    border-radius: 4px;
+}
+
+.all-chat-list::-webkit-scrollbar-thumb {
+    background: #FF9800;
+    border-radius: 4px;
+}
+
+.all-chat-list::-webkit-scrollbar-thumb:hover {
+    background: #F57C00;
 }
 
 .all-chat-message {
@@ -1131,8 +1179,8 @@ body {
     }
 
     .game-chat {
-        min-height: 400px;
-        height: 50vh;
+        min-height: 500px;
+        height: 60vh;
     }
 
     .messages-list {
@@ -1150,6 +1198,53 @@ body {
 
     .message-input button {
         width: 100%;
+    }
+
+    /* Dual chat mobile adjustments */
+    .guess-chat-section {
+        flex: 1 1 60%;
+        min-height: 300px;
+    }
+
+    .all-chat-section {
+        flex: 1 1 40%;
+        min-height: 200px;
+    }
+
+    .guess-messages-list {
+        padding: 10px;
+    }
+
+    .all-chat-list {
+        padding: 10px;
+    }
+
+    .guess-message-item,
+    .all-chat-message {
+        font-size: 0.9rem;
+        padding: 8px 10px;
+    }
+
+    .input-row {
+        flex-direction: row;
+    }
+
+    .input-row input {
+        font-size: 0.9rem;
+    }
+
+    .your-turn-indicator p {
+        font-size: 0.9rem;
+    }
+
+    .guess-chat-header h4,
+    .all-chat-header h4 {
+        font-size: 1rem;
+    }
+
+    .guess-hint,
+    .all-chat-hint {
+        font-size: 0.8rem;
     }
 
     /* Mobile lobby layout */

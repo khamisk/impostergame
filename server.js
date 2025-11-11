@@ -41,11 +41,14 @@ const activeSessions = new Map();
 function loadAnalytics() {
     try {
         if (fs.existsSync(ANALYTICS_FILE)) {
-            return JSON.parse(fs.readFileSync(ANALYTICS_FILE, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(ANALYTICS_FILE, 'utf8'));
+            console.log(`Loaded analytics: ${data.totalVisits} visits, ${data.sessions?.length || 0} sessions`);
+            return data;
         }
     } catch (err) {
         console.error('Failed to load analytics:', err);
     }
+    console.log('Starting with fresh analytics data');
     return {
         totalVisits: 0,
         totalSessionTimeMs: 0,
@@ -56,6 +59,7 @@ function loadAnalytics() {
 function saveAnalytics(data) {
     try {
         fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(data, null, 2));
+        console.log(`Analytics saved: ${data.totalVisits} visits, ${data.totalSessionTimeMs}ms total time`);
     } catch (err) {
         console.error('Failed to save analytics:', err);
     }

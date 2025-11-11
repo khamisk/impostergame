@@ -555,18 +555,22 @@ function updatePlayersList(players) {
     }
 }
 
-function startTurnTimer() {
+function startTurnTimer(baseTurnText) {
     // Clear any existing timer
     if (turnTimer) clearInterval(turnTimer);
 
-    turnTimeLeft = 10;
+    turnTimeLeft = 15;
+
+    // Update display immediately with initial time
+    const turnText = document.getElementById('turnText');
+    turnText.textContent = `${baseTurnText} (${turnTimeLeft}s)`;
 
     turnTimer = setInterval(() => {
         turnTimeLeft--;
 
-        const turnText = document.getElementById('turnText');
-        const currentText = turnText.textContent.split('(')[0].trim();
-        turnText.textContent = `${currentText} (${turnTimeLeft}s)`;
+        if (turnTimeLeft >= 0) {
+            turnText.textContent = `${baseTurnText} (${turnTimeLeft}s)`;
+        }
 
         if (turnTimeLeft <= 0) {
             clearInterval(turnTimer);
@@ -580,20 +584,18 @@ function updateTurnDisplay(currentTurn, players) {
 
     const turnInfo = document.getElementById('turnInfo');
     const guessInputSection = document.getElementById('guessInputSection');
-    const turnText = document.getElementById('turnText');
-
-    // Start turn timer
-    startTurnTimer();
 
     if (isMyTurn) {
-        turnText.textContent = '⏱️ Your turn! (10s)';
+        const baseTurnText = '⏱️ Your turn!';
         turnInfo.classList.add('my-turn');
         guessInputSection.style.display = 'block';
+        startTurnTimer(baseTurnText);
     } else {
         const playerName = currentPlayer ? currentPlayer.username : 'Unknown';
-        turnText.textContent = `⏱️ ${playerName}'s turn (10s)`;
+        const baseTurnText = `⏱️ ${playerName}'s turn`;
         turnInfo.classList.remove('my-turn');
         guessInputSection.style.display = 'none';
+        startTurnTimer(baseTurnText);
     }
 }
 

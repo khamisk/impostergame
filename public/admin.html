@@ -370,6 +370,11 @@
                     <div class="stat-value" id="avgSessionTime">-</div>
                     <div class="stat-subtitle" id="avgSessionTimeMs"></div>
                 </div>
+                <div class="stat-card">
+                    <h3>Total Time Spent</h3>
+                    <div class="stat-value" id="totalTimeSpent">-</div>
+                    <div class="stat-subtitle" id="totalTimeSubtitle"></div>
+                </div>
             </div>
 
             <div class="charts-grid">
@@ -478,6 +483,23 @@
             document.getElementById('uniqueVisitors').textContent = data.uniqueVisitors;
             document.getElementById('avgSessionTime').textContent = data.avgSessionTimeReadable;
             document.getElementById('avgSessionTimeMs').textContent = `${Math.round(data.avgSessionTimeMs / 1000)}s`;
+
+            // Total time spent - convert ms to human-readable format
+            const totalMs = data.totalTimeMs || 0;
+            const totalHours = Math.floor(totalMs / 3600000);
+            const totalMinutes = Math.floor((totalMs % 3600000) / 60000);
+            const totalSeconds = Math.floor((totalMs % 60000) / 1000);
+
+            if (totalHours > 0) {
+                document.getElementById('totalTimeSpent').textContent = `${totalHours}h ${totalMinutes}m`;
+                document.getElementById('totalTimeSubtitle').textContent = `${totalSeconds}s`;
+            } else if (totalMinutes > 0) {
+                document.getElementById('totalTimeSpent').textContent = `${totalMinutes}m`;
+                document.getElementById('totalTimeSubtitle').textContent = `${totalSeconds}s`;
+            } else {
+                document.getElementById('totalTimeSpent').textContent = `${totalSeconds}s`;
+                document.getElementById('totalTimeSubtitle').textContent = '';
+            }
         }
 
         function updateCharts(data) {
