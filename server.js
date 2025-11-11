@@ -68,6 +68,12 @@ function checkAdminToken(req, res, next) {
     const token = req.get('x-admin-token') || req.query.token || '';
     const adminToken = process.env.ADMIN_TOKEN || 'default_admin_token_123';
 
+    console.log('Token check:', {
+        receivedToken: token.substring(0, 10) + '...',
+        expectedToken: adminToken.substring(0, 10) + '...',
+        match: token === adminToken
+    });
+
     if (token !== adminToken) {
         return res.status(401).json({ error: 'Unauthorized - Invalid admin token' });
     }
