@@ -50,21 +50,6 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// Analytics tracking
-let sessionStartTime = Date.now();
-let analyticsData = {
-    visits: parseInt(localStorage.getItem('visits') || '0') + 1,
-    totalTime: parseInt(localStorage.getItem('totalTime') || '0')
-};
-localStorage.setItem('visits', analyticsData.visits);
-
-// Track session time on page unload
-window.addEventListener('beforeunload', () => {
-    const sessionTime = Math.floor((Date.now() - sessionStartTime) / 1000);
-    analyticsData.totalTime += sessionTime;
-    localStorage.setItem('totalTime', analyticsData.totalTime);
-});
-
 // Main Menu
 document.getElementById('createLobbyBtn').addEventListener('click', () => {
     showModal('createLobby');

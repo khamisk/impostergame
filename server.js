@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,12 +18,131 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Serve static files
+// Middleware
 app.use(express.static('public'));
+app.use(express.json());
 
 // Health check endpoint for Railway
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
+
+// Analytics System (Admin Only)
+const ANALYTICS_FILE = path.join(__dirname, 'analytics.json');
+const activeSessions = new Map();
+
+function loadAnalytics() {
+    try {
+        if (fs.existsSync(ANALYTICS_FILE)) {
+            return JSON.parse(fs.readFileSync(ANALYTICS_FILE, 'utf8'));
+        }
+    } catch (err) {
+        console.error('Failed to load analytics:', err);
+    }
+    return {
+        totalVisits: 0,
+        totalSessionTimeMs: 0,
+        sessions: []
+    };
+}
+
+function saveAnalytics(data) {
+    try {
+        fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.error('Failed to save analytics:', err);
+    }
+}
+
+let analytics = loadAnalytics();
+
+// Admin authentication middleware
+function checkAdminToken(req, res, next) {
+    const token = req.get('x-admin-token') || req.query.token || '';
+    const adminToken = process.env.ADMIN_TOKEN || 'default_admin_token_123';
+
+    if (token !== adminToken) {
+        return res.status(401).json({ error: 'Unauthorized - Invalid admin token' });
+    }
+    next();
+}
+
+// Admin Analytics Endpoints
+app.get('/admin/analytics', checkAdminToken, (req, res) => {
+    const sessions = analytics.sessions || [];
+    const activeSess = Array.from(activeSessions.values()).map(s => ({
+        socketId: s.socketId,
+        startTime: new Date(s.start).toISOString(),
+        duration: Math.round((Date.now() - s.start) / 1000) + 's',
+        ip: s.ip,
+        userAgent: s.userAgent
+    }));
+
+    const totalSessions = sessions.length;
+    const avgTimeMs = totalSessions ? Math.round((analytics.totalSessionTimeMs || 0) / totalSessions) : 0;
+
+    // Calculate unique IPs
+    const uniqueIPs = new Set(sessions.map(s => s.ip)).size;
+
+    // User agent breakdown
+    const browserCounts = {};
+    sessions.forEach(s => {
+        const ua = s.userAgent || 'unknown';
+        const browser = ua.includes('Chrome') ? 'Chrome' :
+            ua.includes('Firefox') ? 'Firefox' :
+                ua.includes('Safari') ? 'Safari' :
+                    ua.includes('Edge') ? 'Edge' : 'Other';
+        browserCounts[browser] = (browserCounts[browser] || 0) + 1;
+    });
+
+    // Platform breakdown
+    const platformCounts = {};
+    sessions.forEach(s => {
+        const ua = s.userAgent || 'unknown';
+        const platform = ua.includes('Mobile') || ua.includes('Android') || ua.includes('iPhone') ? 'Mobile' :
+            ua.includes('Windows') ? 'Windows' :
+                ua.includes('Mac') ? 'Mac' :
+                    ua.includes('Linux') ? 'Linux' : 'Other';
+        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+    });
+
+    res.json({
+        totalVisits: analytics.totalVisits || 0,
+        totalSessions: totalSessions,
+        uniqueVisitors: uniqueIPs,
+        avgSessionTimeMs: avgTimeMs,
+        avgSessionTimeReadable: `${Math.floor(avgTimeMs / 60000)}m ${Math.floor((avgTimeMs % 60000) / 1000)}s`,
+        totalTimeMs: analytics.totalSessionTimeMs || 0,
+        browsers: browserCounts,
+        platforms: platformCounts,
+        activeSessions: activeSess,
+        activeCount: activeSess.length
+    });
+});
+
+app.get('/admin/analytics/sessions', checkAdminToken, (req, res) => {
+    const limit = parseInt(req.query.limit) || 100;
+    const sessions = (analytics.sessions || []).slice(-limit).reverse().map(s => ({
+        socketId: s.socketId,
+        startTime: new Date(s.start).toISOString(),
+        endTime: new Date(s.end).toISOString(),
+        durationMs: s.durationMs,
+        durationReadable: `${Math.floor(s.durationMs / 60000)}m ${Math.floor((s.durationMs % 60000) / 1000)}s`,
+        ip: s.ip,
+        userAgent: s.userAgent
+    }));
+
+    res.json({ sessions, total: analytics.sessions?.length || 0 });
+});
+
+app.get('/admin/analytics/download', checkAdminToken, (req, res) => {
+    res.download(ANALYTICS_FILE, 'analytics.json');
+});
+
+app.post('/admin/analytics/clear', checkAdminToken, (req, res) => {
+    analytics = { totalVisits: 0, totalSessionTimeMs: 0, sessions: [] };
+    saveAnalytics(analytics);
+    res.json({ success: true, message: 'Analytics cleared' });
 });
 
 // Game state
@@ -351,6 +471,33 @@ function concludeVoting(lobby, lobbyCode) {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    // Analytics: Track new session
+    try {
+        const headers = socket.handshake.headers || {};
+        const ip = headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+            socket.handshake.address ||
+            socket.conn.remoteAddress ||
+            'unknown';
+        const userAgent = headers['user-agent'] || 'unknown';
+
+        const session = {
+            socketId: socket.id,
+            start: Date.now(),
+            end: null,
+            durationMs: null,
+            ip,
+            userAgent
+        };
+
+        activeSessions.set(socket.id, session);
+        analytics.totalVisits = (analytics.totalVisits || 0) + 1;
+        saveAnalytics(analytics);
+
+        console.log(`Session started: ${socket.id} from ${ip}`);
+    } catch (err) {
+        console.error('Analytics tracking error:', err);
+    }
+
     // Send initial lobby list
     socket.emit('lobbyList', getPublicLobbies());
 
@@ -670,6 +817,26 @@ io.on('connection', (socket) => {
     // Disconnect
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+
+        // Analytics: Finalize session
+        try {
+            const session = activeSessions.get(socket.id);
+            if (session) {
+                session.end = Date.now();
+                session.durationMs = session.end - session.start;
+
+                analytics.totalSessionTimeMs = (analytics.totalSessionTimeMs || 0) + session.durationMs;
+                analytics.sessions = analytics.sessions || [];
+                analytics.sessions.push(session);
+
+                saveAnalytics(analytics);
+                activeSessions.delete(socket.id);
+
+                console.log(`Session ended: ${socket.id} - Duration: ${Math.round(session.durationMs / 1000)}s`);
+            }
+        } catch (err) {
+            console.error('Analytics finalization error:', err);
+        }
 
         const playerInfo = players.get(socket.id);
         if (playerInfo) {
