@@ -352,14 +352,14 @@ function startTurnTimer(lobby, lobbyCode) {
         // Move to next turn
         lobby.currentTurn = getNextTurnPlayer(lobby);
 
-        // Check if round is complete (count only active players)
-        const activePlayers = lobby.players.filter(p => !p.hasLeft);
+        // Check if round is complete (count only active players - not left, not spectators)
+        const activePlayers = lobby.players.filter(p => !p.hasLeft && !p.isSpectator);
         if (messagesThisRound + 1 === activePlayers.length) {
             if (lobby.round < (lobby.totalRounds || 3)) {
                 // Start next round
                 lobby.round++;
                 // Find first active player for next round
-                const firstActivePlayer = lobby.players.find(p => !p.hasLeft);
+                const firstActivePlayer = lobby.players.find(p => !p.hasLeft && !p.isSpectator);
                 lobby.currentTurn = firstActivePlayer ? firstActivePlayer.socketId : lobby.players[0].socketId;
 
                 // Start timer for new round
@@ -368,7 +368,7 @@ function startTurnTimer(lobby, lobbyCode) {
                 // All rounds complete, start voting
                 lobby.state = 'voting';
                 io.to(lobbyCode).emit('votingPhase', {
-                    players: lobby.players.map(p => ({
+                    players: lobby.players.filter(p => !p.hasLeft && !p.isSpectator).map(p => ({
                         username: p.username,
                         socketId: p.socketId
                     }))
@@ -397,8 +397,8 @@ function startTurnTimer(lobby, lobbyCode) {
 }
 
 function getNextTurnPlayer(lobby) {
-    // Maintain the turn order established in the first round, skip players who left
-    const activePlayers = lobby.players.filter(p => !p.hasLeft);
+    // Maintain the turn order established in the first round, skip players who left or are spectators
+    const activePlayers = lobby.players.filter(p => !p.hasLeft && !p.isSpectator);
     if (activePlayers.length === 0) return null;
 
     // Find current player index in active players
@@ -411,7 +411,7 @@ function getNextTurnPlayer(lobby) {
             // Fallback to first active player
             return activePlayers[0].socketId;
         }
-    } while (lobby.players[lobby.turnOrderIndex].hasLeft);
+    } while (lobby.players[lobby.turnOrderIndex].hasLeft || lobby.players[lobby.turnOrderIndex].isSpectator);
 
     return lobby.players[lobby.turnOrderIndex].socketId;
 }
@@ -832,9 +832,9 @@ io.on('connection', (socket) => {
         console.log('🔄 Next turn:', nextTurn);
         lobby.currentTurn = nextTurn;
 
-        // Check if round is complete (count only active players)
+        // Check if round is complete (count only active players - not left, not spectators)
         const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
-        const activePlayers = lobby.players.filter(p => !p.hasLeft);
+        const activePlayers = lobby.players.filter(p => !p.hasLeft && !p.isSpectator);
         console.log('📊 Round status:', { messagesThisRound, activePlayers: activePlayers.length, round: lobby.round });
 
         if (messagesThisRound === activePlayers.length) {
@@ -842,7 +842,7 @@ io.on('connection', (socket) => {
                 // Start next round
                 lobby.round++;
                 // Find first active player for next round
-                const firstActivePlayer = lobby.players.find(p => !p.hasLeft);
+                const firstActivePlayer = lobby.players.find(p => !p.hasLeft && !p.isSpectator);
                 lobby.currentTurn = firstActivePlayer ? firstActivePlayer.socketId : lobby.players[0].socketId;
 
                 // Start timer for next round
@@ -851,7 +851,7 @@ io.on('connection', (socket) => {
                 // All rounds complete, start voting
                 lobby.state = 'voting';
                 io.to(playerInfo.lobbyCode).emit('votingPhase', {
-                    players: lobby.players.map(p => ({
+                    players: lobby.players.filter(p => !p.hasLeft && !p.isSpectator).map(p => ({
                         username: p.username,
                         socketId: p.socketId
                     }))
@@ -931,7 +931,7 @@ io.on('connection', (socket) => {
         if (!lobby || lobby.state !== 'voting') return;
 
         const player = lobby.players.find(p => p.socketId === socket.id);
-        if (!player || player.hasVoted) return;
+        if (!player || player.hasVoted || player.isSpectator || player.hasLeft) return;
 
         player.hasVoted = true;
         lobby.votes.set(socket.id, targetSocketId);
@@ -950,8 +950,9 @@ io.on('connection', (socket) => {
             playersVoted: playersVoted
         });
 
-        // Check if all votes are in
-        const allVoted = lobby.players.every(p => p.hasVoted);
+        // Check if all active players have voted
+        const activePlayers = lobby.players.filter(p => !p.hasLeft && !p.isSpectator);
+        const allVoted = activePlayers.every(p => p.hasVoted);
         if (allVoted) {
             // Cancel timer since everyone voted
             if (lobby.votingTimer) {
@@ -1085,19 +1086,19 @@ io.on('connection', (socket) => {
 
                                 // Check if round is complete
                                 const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
-                                const activePlayers = lobby.players.filter(p => !p.hasLeft);
+                                const activePlayers = lobby.players.filter(p => !p.hasLeft && !p.isSpectator);
 
                                 if (messagesThisRound === activePlayers.length) {
                                     if (lobby.round < (lobby.totalRounds || 3)) {
                                         lobby.round++;
-                                        const firstActivePlayer = lobby.players.find(p => !p.hasLeft);
+                                        const firstActivePlayer = lobby.players.find(p => !p.hasLeft && !p.isSpectator);
                                         lobby.currentTurn = firstActivePlayer ? firstActivePlayer.socketId : lobby.players[0].socketId;
                                         startTurnTimer(lobby, playerInfo.lobbyCode);
                                     } else {
                                         // Start voting
                                         lobby.state = 'voting';
                                         io.to(playerInfo.lobbyCode).emit('votingPhase', {
-                                            players: lobby.players.filter(p => !p.hasLeft).map(p => ({
+                                            players: lobby.players.filter(p => !p.hasLeft && !p.isSpectator).map(p => ({
                                                 username: p.username,
                                                 socketId: p.socketId
                                             }))
