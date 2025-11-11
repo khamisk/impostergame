@@ -325,7 +325,7 @@ function startTurnTimer(lobby, lobbyCode) {
         clearTimeout(lobby.turnTimer);
     }
 
-    // Start 10 second timer
+    // Start 15 second timer
     lobby.turnTimer = setTimeout(() => {
         // Time's up - automatically submit empty message or skip turn
         const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
@@ -384,7 +384,7 @@ function startTurnTimer(lobby, lobbyCode) {
             round: lobby.round,
             totalRounds: lobby.totalRounds || 3
         });
-    }, 10000);
+    }, 15000);
 }
 
 function getNextTurnPlayer(lobby) {

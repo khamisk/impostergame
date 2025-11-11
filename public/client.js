@@ -10,6 +10,7 @@ let votingTimer = null;
 let votingTimeLeft = 20;
 let turnTimer = null;
 let turnTimeLeft = 15; // 15 seconds per turn
+let currentPlayers = []; // Store current game players
 
 // DOM Elements
 const screens = {
@@ -338,6 +339,7 @@ socket.on('kicked', () => {
 
 socket.on('gameStarted', ({ isImposter, isSpectator, card, currentTurn, round, players, totalRounds }) => {
     showScreen('gameScreen');
+    currentPlayers = players; // Store players globally
     const roundsText = totalRounds || (players.length === 3 ? 3 : 2);
     document.getElementById('currentRound').textContent = round;
     // Update the header to show total rounds
@@ -404,11 +406,8 @@ socket.on('messageReceived', ({ messages, currentTurn, round, totalRounds }) => 
     // Scroll to bottom
     guessMessagesList.scrollTop = guessMessagesList.scrollHeight;
 
-    // Update turn
-    const players = Array.from(document.querySelectorAll('.game-player-item')).map(el => ({
-        username: el.querySelector('span').textContent.replace('👑 ', '').split('<')[0]
-    }));
-    updateTurnDisplay(currentTurn, players);
+    // Update turn using stored players
+    updateTurnDisplay(currentTurn, currentPlayers);
 });
 
 socket.on('votingPhase', ({ players }) => {
