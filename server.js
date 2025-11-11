@@ -175,6 +175,70 @@ function selectImposter(lobby) {
     });
 }
 
+function startTurnTimer(lobby, lobbyCode) {
+    // Clear any existing timer
+    if (lobby.turnTimer) {
+        clearTimeout(lobby.turnTimer);
+    }
+
+    // Start 10 second timer
+    lobby.turnTimer = setTimeout(() => {
+        // Time's up - automatically submit empty message or skip turn
+        const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
+
+        // Add timeout message
+        const currentPlayer = lobby.players.find(p => p.socketId === lobby.currentTurn);
+        if (currentPlayer) {
+            lobby.messages.push({
+                username: currentPlayer.username,
+                message: '(Time out)',
+                round: lobby.round
+            });
+        }
+
+        // Move to next turn
+        lobby.currentTurn = getNextTurnPlayer(lobby);
+
+        // Check if round is complete
+        if (messagesThisRound + 1 === lobby.players.length) {
+            if (lobby.round < 3) {
+                // Start next round
+                lobby.round++;
+                lobby.currentTurn = lobby.players[0].socketId;
+
+                // Start timer for new round
+                startTurnTimer(lobby, lobbyCode);
+            } else {
+                // All rounds complete, start voting
+                lobby.state = 'voting';
+                io.to(lobbyCode).emit('votingPhase', {
+                    players: lobby.players.map(p => ({
+                        username: p.username,
+                        socketId: p.socketId
+                    }))
+                });
+
+                // Start 20 second voting timer
+                lobby.votingTimer = setTimeout(() => {
+                    concludeVoting(lobby, lobbyCode);
+                }, 20000);
+
+                return;
+            }
+        } else {
+            // Start timer for next player's turn
+            startTurnTimer(lobby, lobbyCode);
+        }
+
+        // Send updated game state
+        io.to(lobbyCode).emit('messageReceived', {
+            messages: lobby.messages,
+            currentTurn: lobby.currentTurn,
+            round: lobby.round
+        });
+    }, 10000);
+}
+
 function getNextTurnPlayer(lobby) {
     const currentTurnIndex = lobby.players.findIndex(p => p.socketId === lobby.currentTurn);
     const nextIndex = (currentTurnIndex + 1) % lobby.players.length;
@@ -289,6 +353,22 @@ io.on('connection', (socket) => {
 
     // Send initial lobby list
     socket.emit('lobbyList', getPublicLobbies());
+
+    // Check if lobby exists (for join by code)
+    socket.on('checkLobby', ({ code }, callback) => {
+        const lobby = lobbies.get(code);
+
+        if (!lobby) {
+            callback({ exists: false });
+            return;
+        }
+
+        callback({
+            exists: true,
+            requiresPassword: !!lobby.password,
+            name: lobby.name
+        });
+    });
 
     // Create lobby
     socket.on('createLobby', ({ lobbyName, username, password, maxPlayers }) => {
@@ -446,6 +526,9 @@ io.on('connection', (socket) => {
             lobby.votingTimer = null;
         }
 
+        // Initialize turn timer
+        lobby.turnTimer = null;
+
         // Send game state to each player
         lobby.players.forEach(player => {
             io.to(player.socketId).emit('gameStarted', {
@@ -461,6 +544,9 @@ io.on('connection', (socket) => {
                 }))
             });
         });
+
+        // Start the turn timer for the first turn
+        startTurnTimer(lobby, playerInfo.lobbyCode);
 
         io.emit('lobbyList', getPublicLobbies());
     });
@@ -482,6 +568,12 @@ io.on('connection', (socket) => {
         const trimmedMessage = message.trim().substring(0, 20);
         if (!trimmedMessage) return;
 
+        // Clear turn timer since player submitted
+        if (lobby.turnTimer) {
+            clearTimeout(lobby.turnTimer);
+            lobby.turnTimer = null;
+        }
+
         lobby.messages.push({
             username: player.username,
             message: trimmedMessage,
@@ -498,6 +590,9 @@ io.on('connection', (socket) => {
                 // Start next round
                 lobby.round++;
                 lobby.currentTurn = lobby.players[0].socketId;
+
+                // Start timer for next round
+                startTurnTimer(lobby, playerInfo.lobbyCode);
             } else {
                 // All rounds complete, start voting
                 lobby.state = 'voting';
@@ -515,6 +610,9 @@ io.on('connection', (socket) => {
 
                 return;
             }
+        } else {
+            // Start timer for next player's turn
+            startTurnTimer(lobby, playerInfo.lobbyCode);
         }
 
         // Send updated game state

@@ -8,6 +8,8 @@ let isHost = false;
 let isVotingPhase = false;
 let votingTimer = null;
 let votingTimeLeft = 20;
+let turnTimer = null;
+let turnTimeLeft = 10;
 
 // DOM Elements
 const screens = {
@@ -48,9 +50,44 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
+// Analytics tracking
+let sessionStartTime = Date.now();
+let analyticsData = {
+    visits: parseInt(localStorage.getItem('visits') || '0') + 1,
+    totalTime: parseInt(localStorage.getItem('totalTime') || '0')
+};
+localStorage.setItem('visits', analyticsData.visits);
+
+// Track session time on page unload
+window.addEventListener('beforeunload', () => {
+    const sessionTime = Math.floor((Date.now() - sessionStartTime) / 1000);
+    analyticsData.totalTime += sessionTime;
+    localStorage.setItem('totalTime', analyticsData.totalTime);
+});
+
 // Main Menu
 document.getElementById('createLobbyBtn').addEventListener('click', () => {
     showModal('createLobby');
+});
+
+document.getElementById('joinByCodeBtn').addEventListener('click', () => {
+    const modal = document.getElementById('joinByCodeModal');
+    modal.style.display = 'flex';
+});
+
+document.getElementById('howToPlayBtn').addEventListener('click', () => {
+    const modal = document.getElementById('howToPlayModal');
+    modal.style.display = 'flex';
+});
+
+document.getElementById('howToPlayLobbyBtn').addEventListener('click', () => {
+    const modal = document.getElementById('howToPlayModal');
+    modal.style.display = 'flex';
+});
+
+document.getElementById('closeHowToPlayBtn').addEventListener('click', () => {
+    const modal = document.getElementById('howToPlayModal');
+    modal.style.display = 'none';
 });
 
 document.getElementById('refreshLobbiesBtn').addEventListener('click', () => {
@@ -66,6 +103,12 @@ document.getElementById('cancelCreateBtn').addEventListener('click', () => {
 document.getElementById('cancelJoinBtn').addEventListener('click', () => {
     hideModal('joinLobby');
     document.getElementById('joinLobbyForm').reset();
+});
+
+document.getElementById('cancelCodeJoinBtn').addEventListener('click', () => {
+    const modal = document.getElementById('joinByCodeModal');
+    modal.style.display = 'none';
+    document.getElementById('joinByCodeForm').reset();
 });
 
 // Create Lobby Form
@@ -103,6 +146,42 @@ document.getElementById('joinLobbyForm').addEventListener('submit', (e) => {
     socket.emit('joinLobby', { code, username, password });
     hideModal('joinLobby');
     document.getElementById('joinLobbyForm').reset();
+});
+
+// Join by Code Form
+document.getElementById('joinByCodeForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const code = document.getElementById('lobbyCodeInput').value.trim().toUpperCase();
+    const username = document.getElementById('usernameCodeInput').value.trim();
+    const password = document.getElementById('codePasswordInput').value.trim();
+
+    if (!code || !username) {
+        showToast('Please fill in all required fields', 'error');
+        return;
+    }
+
+    // First check if lobby exists and requires password
+    socket.emit('checkLobby', { code }, (response) => {
+        if (!response.exists) {
+            showToast('Lobby not found', 'error');
+            return;
+        }
+
+        if (response.requiresPassword) {
+            document.getElementById('codePasswordGroup').style.display = 'block';
+            if (!password) {
+                showToast('This lobby requires a password', 'error');
+                return;
+            }
+        }
+
+        socket.emit('joinLobby', { code, username, password });
+        const modal = document.getElementById('joinByCodeModal');
+        modal.style.display = 'none';
+        document.getElementById('joinByCodeForm').reset();
+        document.getElementById('codePasswordGroup').style.display = 'none';
+    });
 });
 
 // Lobby Actions
@@ -402,6 +481,25 @@ function updatePlayersList(players) {
     }
 }
 
+function startTurnTimer() {
+    // Clear any existing timer
+    if (turnTimer) clearInterval(turnTimer);
+
+    turnTimeLeft = 10;
+
+    turnTimer = setInterval(() => {
+        turnTimeLeft--;
+
+        const turnText = document.getElementById('turnText');
+        const currentText = turnText.textContent.split('(')[0].trim();
+        turnText.textContent = `${currentText} (${turnTimeLeft}s)`;
+
+        if (turnTimeLeft <= 0) {
+            clearInterval(turnTimer);
+        }
+    }, 1000);
+}
+
 function updateTurnDisplay(currentTurn, players) {
     const isMyTurn = currentTurn === mySocketId;
     const currentPlayer = players ? players.find(p => p.socketId === currentTurn) : null;
@@ -410,13 +508,16 @@ function updateTurnDisplay(currentTurn, players) {
     const messageInputSection = document.getElementById('messageInputSection');
     const turnText = document.getElementById('turnText');
 
+    // Start turn timer
+    startTurnTimer();
+
     if (isMyTurn) {
-        turnText.textContent = 'Your turn! Type your message:';
+        turnText.textContent = 'Your turn! Type your message: (10s)';
         turnInfo.classList.add('my-turn');
         messageInputSection.style.display = 'flex';
     } else {
         const playerName = currentPlayer ? currentPlayer.username : 'Unknown';
-        turnText.textContent = `Waiting for ${playerName}'s message...`;
+        turnText.textContent = `Waiting for ${playerName}'s message... (10s)`;
         turnInfo.classList.remove('my-turn');
         messageInputSection.style.display = 'none';
     }
@@ -438,6 +539,8 @@ function startVotingTimer() {
     }, 1000);
 }
 
+let selectedVoteTarget = null;
+
 function updatePlayersListForVoting(players) {
     const gamePlayersList = document.getElementById('gamePlayersList');
 
@@ -450,27 +553,48 @@ function updatePlayersListForVoting(players) {
                 </div>
                 <div class="player-status">
                     <span class="vote-count" style="display: none;">0</span>
+                    <button class="confirm-vote-btn" style="display: none;">✓</button>
                 </div>
             </div>
         `;
     }).join('');
 
-    // Add click listeners for voting
+    // Add click listeners for selecting a player
     document.querySelectorAll('.game-player-item').forEach(item => {
-        item.addEventListener('click', () => {
+        const playerInfo = item.querySelector('.player-info');
+        const confirmBtn = item.querySelector('.confirm-vote-btn');
+
+        playerInfo.addEventListener('click', () => {
             const targetSocketId = item.dataset.socketId;
+
+            // Remove selection from all players
+            document.querySelectorAll('.game-player-item').forEach(i => {
+                i.classList.remove('vote-selected');
+                i.querySelector('.confirm-vote-btn').style.display = 'none';
+            });
+
+            // Select this player
+            item.classList.add('vote-selected');
+            confirmBtn.style.display = 'inline-block';
+            selectedVoteTarget = targetSocketId;
+        });
+
+        // Confirm vote button
+        confirmBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (!selectedVoteTarget) return;
+
             const username = item.querySelector('.player-info span').textContent;
 
-            // Visual confirmation - change color
-            document.querySelectorAll('.game-player-item').forEach(i => {
-                i.classList.remove('my-vote');
-            });
+            // Submit vote
+            socket.emit('submitVote', { targetSocketId: selectedVoteTarget });
+
+            // Add visual confirmation
+            item.classList.remove('vote-selected');
             item.classList.add('my-vote');
 
-            // Submit vote
-            socket.emit('submitVote', { targetSocketId });
-
-            // Disable further voting for this player
+            // Disable further voting
             document.querySelectorAll('.game-player-item').forEach(i => {
                 i.style.pointerEvents = 'none';
             });

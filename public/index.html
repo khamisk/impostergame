@@ -14,9 +14,12 @@
         <div class="container">
             <h1 class="game-title">🎮 GUESS THE IMPOSTER</h1>
             <p class="subtitle">Clash Royale Edition</p>
+            <p class="disclaimer">This game is a fan-made project and has no association with Supercell.</p>
 
             <div class="menu-buttons">
                 <button id="createLobbyBtn" class="btn btn-primary">Create Lobby</button>
+                <button id="joinByCodeBtn" class="btn btn-primary">Join by Code</button>
+                <button id="howToPlayBtn" class="btn btn-info">How to Play</button>
                 <button id="refreshLobbiesBtn" class="btn btn-secondary">Refresh Lobbies</button>
             </div>
 
@@ -85,6 +88,71 @@
         </div>
     </div>
 
+    <!-- Join by Code Modal -->
+    <div id="joinByCodeModal" class="modal">
+        <div class="modal-content">
+            <h2>Join by Code</h2>
+            <form id="joinByCodeForm">
+                <div class="form-group">
+                    <label for="lobbyCodeInput">Lobby Code:</label>
+                    <input type="text" id="lobbyCodeInput" maxlength="6" placeholder="Enter 6-character code" required>
+                </div>
+                <div class="form-group">
+                    <label for="usernameCodeInput">Your Username:</label>
+                    <input type="text" id="usernameCodeInput" maxlength="20" required>
+                </div>
+                <div class="form-group" id="codePasswordGroup" style="display: none;">
+                    <label for="codePasswordInput">Password:</label>
+                    <input type="password" id="codePasswordInput" maxlength="20">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">Join</button>
+                    <button type="button" id="cancelCodeJoinBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- How to Play Modal -->
+    <div id="howToPlayModal" class="modal">
+        <div class="modal-content how-to-play-content">
+            <h2>How to Play</h2>
+            <div class="instructions">
+                <h3>🎯 Objective</h3>
+                <p>Find the imposter among your group! One player is secretly assigned a different card while everyone
+                    else sees the same card.</p>
+
+                <h3>📋 Game Flow</h3>
+                <ol>
+                    <li><strong>Setup:</strong> Create or join a lobby (3-5 players)</li>
+                    <li><strong>Role Assignment:</strong> Everyone gets the same card EXCEPT the imposter, who gets a
+                        different card</li>
+                    <li><strong>3 Rounds of Messaging:</strong> Each player takes turns typing 1-2 words about their
+                        card (10 seconds per turn)</li>
+                    <li><strong>Voting Phase:</strong> After all rounds, everyone votes for who they think is the
+                        imposter (20 seconds)</li>
+                </ol>
+
+                <h3>🎮 Tips</h3>
+                <ul>
+                    <li><strong>Regular Players:</strong> Be specific enough to prove you have the card, but vague
+                        enough to catch the imposter</li>
+                    <li><strong>Imposter:</strong> Listen carefully and try to blend in without revealing you have a
+                        different card</li>
+                </ul>
+
+                <h3>🏆 Scoring</h3>
+                <ul>
+                    <li>If imposter is caught: Everyone else gets 1 point</li>
+                    <li>If imposter survives: Imposter gets 3 points</li>
+                </ul>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" id="closeHowToPlayBtn" class="btn btn-primary">Got it!</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Lobby Screen -->
     <div id="lobbyScreen" class="screen">
         <div class="container">
@@ -100,6 +168,7 @@
 
             <div class="lobby-actions">
                 <button id="startGameBtn" class="btn btn-primary" style="display: none;">Start Game</button>
+                <button id="howToPlayLobbyBtn" class="btn btn-info">How to Play</button>
                 <button id="leaveLobbyBtn" class="btn btn-secondary">Leave Lobby</button>
             </div>
         </div>

@@ -7,6 +7,7 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
     min-height: 100vh;
     color: #333;
 }
@@ -41,7 +42,16 @@ body {
     font-size: 1.5rem;
     color: #f0f0f0;
     text-align: center;
+    margin-bottom: 10px;
+}
+
+.disclaimer {
+    font-size: 0.85rem;
+    color: #e0e0e0;
+    text-align: center;
     margin-bottom: 30px;
+    font-style: italic;
+    opacity: 0.9;
 }
 
 .menu-buttons {
@@ -49,6 +59,7 @@ body {
     gap: 15px;
     justify-content: center;
     margin-bottom: 30px;
+    flex-wrap: wrap;
 }
 
 /* Buttons */
@@ -81,6 +92,17 @@ body {
 
 .btn-secondary:hover {
     background: #0b7dda;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-info {
+    background: #FF9800;
+    color: white;
+}
+
+.btn-info:hover {
+    background: #e68900;
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
@@ -160,6 +182,37 @@ body {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     min-width: 400px;
     max-width: 500px;
+}
+
+.how-to-play-content {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.how-to-play-content h3 {
+    color: #667eea;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.how-to-play-content h3:first-of-type {
+    margin-top: 0;
+}
+
+.how-to-play-content ol,
+.how-to-play-content ul {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+.how-to-play-content li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.instructions {
+    margin-bottom: 20px;
 }
 
 .modal-content h2 {
@@ -412,17 +465,39 @@ body {
     border: 2px solid #ff9800;
 }
 
+.game-player-item.vote-selected {
+    background: #e3f2fd;
+    border: 2px solid #2196F3;
+}
+
 .player-info {
     display: flex;
     align-items: center;
     gap: 8px;
     flex: 1;
+    cursor: pointer;
 }
 
 .player-status {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.confirm-vote-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.confirm-vote-btn:hover {
+    background: #45a049;
+    transform: scale(1.1);
 }
 
 .vote-count {
@@ -685,6 +760,14 @@ body {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    body {
+        font-size: 14px;
+    }
+
+    .container {
+        padding: 10px;
+    }
+
     .game-title {
         font-size: 2rem;
     }
@@ -693,28 +776,121 @@ body {
         font-size: 1.2rem;
     }
 
+    .disclaimer {
+        font-size: 0.75rem;
+    }
+
     .modal-content {
         min-width: 90%;
+        max-width: 95%;
         padding: 20px;
+    }
+
+    .how-to-play-content {
+        max-height: 70vh;
     }
 
     .menu-buttons {
         flex-direction: column;
+        width: 100%;
+        padding: 0 10px;
     }
 
     .btn {
         width: 100%;
+        padding: 15px;
+        font-size: 1.1rem;
     }
 
+    /* Mobile game layout */
     .game-container {
         flex-direction: column;
+        height: auto;
     }
 
     .game-sidebar {
         width: 100%;
+        max-width: 100%;
+        min-height: auto;
+    }
+
+    .card-display {
+        padding: 15px;
+    }
+
+    .card-container img {
+        max-width: 150px;
+        max-height: 200px;
+    }
+
+    .game-players {
+        max-height: 200px;
+        overflow-y: auto;
     }
 
     .game-chat {
         min-height: 400px;
+        height: 50vh;
+    }
+
+    .messages-list {
+        height: calc(50vh - 150px);
+    }
+
+    .message-input {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .message-input input {
+        width: 100%;
+    }
+
+    .message-input button {
+        width: 100%;
+    }
+
+    /* Mobile lobby layout */
+    .lobbies-section {
+        padding: 15px;
+    }
+
+    .lobby-item {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .join-lobby-btn {
+        width: 100%;
+    }
+
+    /* Mobile game-over layout */
+    .game-over-content h2 {
+        font-size: 1.5rem;
+    }
+
+    .reveal-card-container img {
+        max-width: 150px;
+        max-height: 200px;
+    }
+}
+
+/* Very small mobile devices */
+@media (max-width: 480px) {
+    .game-title {
+        font-size: 1.5rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .modal-content h2 {
+        font-size: 1.3rem;
+    }
+
+    .card-container img {
+        max-width: 120px;
+        max-height: 160px;
     }
 }
