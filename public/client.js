@@ -9,7 +9,7 @@ let isVotingPhase = false;
 let votingTimer = null;
 let votingTimeLeft = 20;
 let turnTimer = null;
-let turnTimeLeft = 10;
+let turnTimeLeft = 15; // 15 seconds per turn
 
 // DOM Elements
 const screens = {
@@ -205,6 +205,25 @@ document.getElementById('messageInput').addEventListener('keypress', (e) => {
     }
 });
 
+// All Chat Handlers
+document.getElementById('sendAllChatBtn').addEventListener('click', () => {
+    const allChatInput = document.getElementById('allChatInput');
+    const message = allChatInput.value.trim();
+
+    if (!message) {
+        return;
+    }
+
+    socket.emit('submitAllChat', { message });
+    allChatInput.value = '';
+});
+
+document.getElementById('allChatInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('sendAllChatBtn').click();
+    }
+});
+
 // Socket Event Handlers
 socket.on('connect', () => {
     mySocketId = socket.id;
@@ -262,9 +281,52 @@ socket.on('playerJoined', ({ players }) => {
     showToast('A player joined', 'info');
 });
 
-socket.on('playerLeft', ({ players }) => {
+socket.on('playerLeft', ({ players, leftPlayerName }) => {
     updatePlayersList(players);
-    showToast('A player left', 'info');
+
+    // Update game screen player list if in game
+    if (currentScreen === 'gameScreen') {
+        const gamePlayersList = document.getElementById('gamePlayersList');
+        gamePlayersList.innerHTML = players.map(p => `
+            <div class="game-player-item${p.hasLeft ? ' player-left' : ''}">
+                <span>${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}${p.isSpectator ? '<span class="spectator-badge">Spectator</span>' : ''}${p.hasLeft ? '<span class="left-badge">Left</span>' : ''}</span>
+                <span class="player-score">${p.score} pts</span>
+            </div>
+        `).join('');
+    }
+
+    if (leftPlayerName) {
+        showToast(`${leftPlayerName} left the lobby`, 'info');
+
+        // Add notification to all-chat if in game
+        if (currentScreen === 'gameScreen') {
+            const allChatList = document.getElementById('allChatList');
+            const notification = document.createElement('div');
+            notification.className = 'player-left-notification';
+            notification.textContent = `⚠️ ${leftPlayerName} left the game`;
+            allChatList.appendChild(notification);
+            allChatList.scrollTop = allChatList.scrollHeight;
+        }
+    } else {
+        showToast('A player left', 'info');
+    }
+}); socket.on('allChatMessage', ({ username, message, timestamp }) => {
+    const allChatList = document.getElementById('allChatList');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'all-chat-message';
+
+    const time = new Date(timestamp).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    messageDiv.innerHTML = `
+        <strong>${escapeHtml(username)}:</strong> ${escapeHtml(message)}
+        <span class="timestamp">${time}</span>
+    `;
+
+    allChatList.appendChild(messageDiv);
+    allChatList.scrollTop = allChatList.scrollHeight;
 });
 
 socket.on('kicked', () => {
@@ -274,14 +336,32 @@ socket.on('kicked', () => {
     showToast('You were kicked from the lobby', 'error');
 });
 
-socket.on('gameStarted', ({ isImposter, card, currentTurn, round, players }) => {
+socket.on('gameStarted', ({ isImposter, isSpectator, card, currentTurn, round, players, totalRounds }) => {
     showScreen('gameScreen');
+    const roundsText = totalRounds || (players.length === 3 ? 3 : 2);
     document.getElementById('currentRound').textContent = round;
+    // Update the header to show total rounds
+    document.querySelector('.game-header h3').textContent = `Round ${round}/${roundsText}`;
 
-    // Show card or imposter message
-    if (isImposter) {
+    // Show card or imposter message or spectator message
+    if (isSpectator) {
         document.getElementById('cardDisplay').style.display = 'none';
-        document.getElementById('imposterDisplay').style.display = 'block';
+        document.getElementById('imposterDisplay').style.display = 'flex';
+        document.getElementById('imposterDisplay').innerHTML = `
+            <div class="imposter-card">
+                <h2>👁️ SPECTATING</h2>
+                <p>You will join the next game!</p>
+            </div>
+        `;
+    } else if (isImposter) {
+        document.getElementById('cardDisplay').style.display = 'none';
+        document.getElementById('imposterDisplay').style.display = 'flex';
+        document.getElementById('imposterDisplay').innerHTML = `
+            <div class="imposter-card">
+                <h2>🎭 YOU ARE THE IMPOSTER</h2>
+                <p>Blend in!</p>
+            </div>
+        `;
     } else {
         document.getElementById('cardDisplay').style.display = 'flex';
         document.getElementById('imposterDisplay').style.display = 'none';
@@ -292,38 +372,41 @@ socket.on('gameStarted', ({ isImposter, card, currentTurn, round, players }) => 
     // Update players list
     const gamePlayersList = document.getElementById('gamePlayersList');
     gamePlayersList.innerHTML = players.map(p => `
-        <div class="game-player-item">
-            <span>${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}</span>
+        <div class="game-player-item${p.hasLeft ? ' player-left' : ''}">
+            <span>${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}${p.isSpectator ? '<span class="spectator-badge">Spectator</span>' : ''}${p.hasLeft ? '<span class="left-badge">Left</span>' : ''}</span>
             <span class="player-score">${p.score} pts</span>
         </div>
     `).join('');
 
     // Clear messages
-    document.getElementById('messagesList').innerHTML = '';
+    document.getElementById('guessMessagesList').innerHTML = '';
+    document.getElementById('allChatList').innerHTML = '';
 
     // Update turn
     updateTurnDisplay(currentTurn, players);
     showToast('Game started!', 'success');
 });
 
-socket.on('messageReceived', ({ messages, currentTurn, round }) => {
+socket.on('messageReceived', ({ messages, currentTurn, round, totalRounds }) => {
+    const roundsText = totalRounds || 3;
+    document.querySelector('.game-header h3').textContent = `Round ${round}/${roundsText}`;
     document.getElementById('currentRound').textContent = round;
 
-    // Update messages list
-    const messagesList = document.getElementById('messagesList');
-    messagesList.innerHTML = messages.map(m => `
-        <div class="message-item">
+    // Update guess messages list
+    const guessMessagesList = document.getElementById('guessMessagesList');
+    guessMessagesList.innerHTML = messages.map(m => `
+        <div class="guess-message-item">
             <strong>${escapeHtml(m.username)}:</strong> ${escapeHtml(m.message)}
             <span class="round-badge">R${m.round}</span>
         </div>
     `).join('');
 
     // Scroll to bottom
-    messagesList.scrollTop = messagesList.scrollHeight;
+    guessMessagesList.scrollTop = guessMessagesList.scrollHeight;
 
     // Update turn
     const players = Array.from(document.querySelectorAll('.game-player-item')).map(el => ({
-        username: el.querySelector('span').textContent.replace('👑 ', '')
+        username: el.querySelector('span').textContent.replace('👑 ', '').split('<')[0]
     }));
     updateTurnDisplay(currentTurn, players);
 });
@@ -332,8 +415,8 @@ socket.on('votingPhase', ({ players }) => {
     isVotingPhase = true;
     votingTimeLeft = 20;
 
-    // Hide message input
-    document.getElementById('messageInputSection').style.display = 'none';
+    // Hide guess input
+    document.getElementById('guessInputSection').style.display = 'none';
 
     // Update turn info
     document.getElementById('turnText').textContent = '🗳️ Vote for the imposter!';
@@ -360,7 +443,7 @@ socket.on('voteReceived', () => {
     showToast('Vote recorded', 'success');
 });
 
-socket.on('gameOver', ({ imposterWon, imposterUsername, votedOutUsername, card, players }) => {
+socket.on('gameOver', ({ imposterWon, imposterLeft, imposterUsername, votedOutUsername, card, players }) => {
     // Clean up voting state
     isVotingPhase = false;
     if (votingTimer) {
@@ -373,7 +456,13 @@ socket.on('gameOver', ({ imposterWon, imposterUsername, votedOutUsername, card, 
 
     const gameOverContent = document.getElementById('gameOverContent');
 
-    if (imposterWon) {
+    if (imposterLeft) {
+        gameOverContent.innerHTML = `
+            <h2 class="imposter-caught">✅ GAME OVER - IMPOSTER LEFT!</h2>
+            <p class="result-text">${escapeHtml(imposterUsername)} was the imposter and left the game!</p>
+            <p class="result-text">Regular players win!</p>
+        `;
+    } else if (imposterWon) {
         gameOverContent.innerHTML = `
             <h2 class="imposter-won">🎭 IMPOSTER WINS!</h2>
             <p class="result-text">${escapeHtml(imposterUsername)} was the imposter and survived!</p>
@@ -439,7 +528,7 @@ function updatePlayersList(players) {
         return `
             <div class="player-item">
                 <span class="player-name">
-                    ${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}${isMe ? ' (You)' : ''}
+                    ${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}${isMe ? ' (You)' : ''}${p.isSpectator ? '<span class="spectator-badge">Spectator</span>' : ''}
                 </span>
                 <span class="player-score">${p.score} pts</span>
                 ${showKickBtn ? `<button class="kick-btn" data-socket-id="${p.socketId}">✕</button>` : ''}
@@ -490,21 +579,21 @@ function updateTurnDisplay(currentTurn, players) {
     const currentPlayer = players ? players.find(p => p.socketId === currentTurn) : null;
 
     const turnInfo = document.getElementById('turnInfo');
-    const messageInputSection = document.getElementById('messageInputSection');
+    const guessInputSection = document.getElementById('guessInputSection');
     const turnText = document.getElementById('turnText');
 
     // Start turn timer
     startTurnTimer();
 
     if (isMyTurn) {
-        turnText.textContent = 'Your turn! Type your message: (10s)';
+        turnText.textContent = '⏱️ Your turn! (10s)';
         turnInfo.classList.add('my-turn');
-        messageInputSection.style.display = 'flex';
+        guessInputSection.style.display = 'block';
     } else {
         const playerName = currentPlayer ? currentPlayer.username : 'Unknown';
-        turnText.textContent = `Waiting for ${playerName}'s message... (10s)`;
+        turnText.textContent = `⏱️ ${playerName}'s turn (10s)`;
         turnInfo.classList.remove('my-turn');
-        messageInputSection.style.display = 'none';
+        guessInputSection.style.display = 'none';
     }
 }
 

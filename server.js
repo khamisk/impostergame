@@ -339,12 +339,15 @@ function startTurnTimer(lobby, lobbyCode) {
         // Move to next turn
         lobby.currentTurn = getNextTurnPlayer(lobby);
 
-        // Check if round is complete
-        if (messagesThisRound + 1 === lobby.players.length) {
-            if (lobby.round < 3) {
+        // Check if round is complete (count only active players)
+        const activePlayers = lobby.players.filter(p => !p.hasLeft);
+        if (messagesThisRound + 1 === activePlayers.length) {
+            if (lobby.round < (lobby.totalRounds || 3)) {
                 // Start next round
                 lobby.round++;
-                lobby.currentTurn = lobby.players[0].socketId;
+                // Find first active player for next round
+                const firstActivePlayer = lobby.players.find(p => !p.hasLeft);
+                lobby.currentTurn = firstActivePlayer ? firstActivePlayer.socketId : lobby.players[0].socketId;
 
                 // Start timer for new round
                 startTurnTimer(lobby, lobbyCode);
@@ -374,14 +377,29 @@ function startTurnTimer(lobby, lobbyCode) {
         io.to(lobbyCode).emit('messageReceived', {
             messages: lobby.messages,
             currentTurn: lobby.currentTurn,
-            round: lobby.round
+            round: lobby.round,
+            totalRounds: lobby.totalRounds || 3
         });
     }, 10000);
 }
 
 function getNextTurnPlayer(lobby) {
-    // Maintain the turn order established in the first round
-    lobby.turnOrderIndex = (lobby.turnOrderIndex + 1) % lobby.players.length;
+    // Maintain the turn order established in the first round, skip players who left
+    const activePlayers = lobby.players.filter(p => !p.hasLeft);
+    if (activePlayers.length === 0) return null;
+
+    // Find current player index in active players
+    let attempts = 0;
+    do {
+        lobby.turnOrderIndex = (lobby.turnOrderIndex + 1) % lobby.players.length;
+        attempts++;
+        // Prevent infinite loop
+        if (attempts > lobby.players.length) {
+            // Fallback to first active player
+            return activePlayers[0].socketId;
+        }
+    } while (lobby.players[lobby.turnOrderIndex].hasLeft);
+
     return lobby.players[lobby.turnOrderIndex].socketId;
 }
 
@@ -474,6 +492,7 @@ function concludeVoting(lobby, lobbyCode) {
         lobby.players.forEach(p => {
             p.isImposter = false;
             p.hasVoted = false;
+            p.isSpectator = false; // Spectators become active players for next game
         });
 
         io.to(lobbyCode).emit('backToLobby', {
@@ -481,7 +500,8 @@ function concludeVoting(lobby, lobbyCode) {
                 username: p.username,
                 isHost: p.isHost,
                 score: p.score,
-                socketId: p.socketId
+                socketId: p.socketId,
+                isSpectator: p.isSpectator
             }))
         });
     }, 8000);
@@ -552,7 +572,8 @@ io.on('connection', (socket) => {
             currentTurn: null,
             round: 0,
             messages: [],
-            votes: new Map()
+            votes: new Map(),
+            allChatMessages: []
         };
 
         const player = {
@@ -561,7 +582,8 @@ io.on('connection', (socket) => {
             isHost: true,
             isImposter: false,
             score: 0,
-            hasVoted: false
+            hasVoted: false,
+            isSpectator: false
         };
 
         lobby.players.push(player);
@@ -603,20 +625,33 @@ io.on('connection', (socket) => {
             isHost: false,
             isImposter: false,
             score: 0,
-            hasVoted: false
+            hasVoted: false,
+            isSpectator: lobby.state === 'playing' || lobby.state === 'voting' // Spectator if game in progress
         };
 
         lobby.players.push(player);
         players.set(socket.id, { lobbyCode: code, username });
 
         socket.join(code);
-        socket.emit('lobbyJoined', { code, lobby: getLobbyData(lobby, socket.id) });
+
+        if (player.isSpectator) {
+            socket.emit('lobbyJoined', {
+                code,
+                lobby: getLobbyData(lobby, socket.id),
+                spectating: true,
+                message: 'You are spectating. You will join the next game.'
+            });
+        } else {
+            socket.emit('lobbyJoined', { code, lobby: getLobbyData(lobby, socket.id) });
+        }
+
         io.to(code).emit('playerJoined', {
             players: lobby.players.map(p => ({
                 username: p.username,
                 isHost: p.isHost,
                 score: p.score,
-                socketId: p.socketId
+                socketId: p.socketId,
+                isSpectator: p.isSpectator
             }))
         });
         io.emit('lobbyList', getPublicLobbies());
@@ -668,10 +703,15 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // Determine number of rounds based on player count
+        // 3 players = 3 rounds, 4+ players = 2 rounds
+        const totalRounds = lobby.players.length === 3 ? 3 : 2;
+
         // Start the game
         lobby.state = 'playing';
         lobby.card = getRandomCard();
         lobby.round = 1;
+        lobby.totalRounds = totalRounds;
         lobby.messages = [];
         lobby.votes = new Map();
 
@@ -701,14 +741,17 @@ io.on('connection', (socket) => {
         lobby.players.forEach(player => {
             io.to(player.socketId).emit('gameStarted', {
                 isImposter: player.isImposter,
-                card: player.isImposter ? null : lobby.card,
+                isSpectator: player.isSpectator,
+                card: player.isImposter || player.isSpectator ? null : lobby.card,
                 currentTurn: lobby.currentTurn,
                 round: lobby.round,
+                totalRounds: lobby.totalRounds,
                 players: lobby.players.map(p => ({
                     username: p.username,
                     isHost: p.isHost,
                     score: p.score,
-                    socketId: p.socketId
+                    socketId: p.socketId,
+                    isSpectator: p.isSpectator
                 }))
             });
         });
@@ -751,13 +794,16 @@ io.on('connection', (socket) => {
         // Move to next turn
         lobby.currentTurn = getNextTurnPlayer(lobby);
 
-        // Check if round is complete
+        // Check if round is complete (count only active players)
         const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
-        if (messagesThisRound === lobby.players.length) {
-            if (lobby.round < 3) {
+        const activePlayers = lobby.players.filter(p => !p.hasLeft);
+        if (messagesThisRound === activePlayers.length) {
+            if (lobby.round < (lobby.totalRounds || 3)) {
                 // Start next round
                 lobby.round++;
-                lobby.currentTurn = lobby.players[0].socketId;
+                // Find first active player for next round
+                const firstActivePlayer = lobby.players.find(p => !p.hasLeft);
+                lobby.currentTurn = firstActivePlayer ? firstActivePlayer.socketId : lobby.players[0].socketId;
 
                 // Start timer for next round
                 startTurnTimer(lobby, playerInfo.lobbyCode);
@@ -787,7 +833,47 @@ io.on('connection', (socket) => {
         io.to(playerInfo.lobbyCode).emit('messageReceived', {
             messages: lobby.messages,
             currentTurn: lobby.currentTurn,
-            round: lobby.round
+            round: lobby.round,
+            totalRounds: lobby.totalRounds || 3
+        });
+    });
+
+    // Submit all-chat message (available anytime)
+    socket.on('submitAllChat', ({ message }) => {
+        const playerInfo = players.get(socket.id);
+        if (!playerInfo) return;
+
+        const lobby = lobbies.get(playerInfo.lobbyCode);
+        if (!lobby) return;
+
+        const player = lobby.players.find(p => p.socketId === socket.id);
+        if (!player) return;
+
+        // Trim and validate message (max 100 characters for all-chat)
+        const trimmedMessage = message.trim().substring(0, 100);
+        if (!trimmedMessage) return;
+
+        // Initialize allChatMessages if it doesn't exist
+        if (!lobby.allChatMessages) {
+            lobby.allChatMessages = [];
+        }
+
+        lobby.allChatMessages.push({
+            username: player.username,
+            message: trimmedMessage,
+            timestamp: Date.now()
+        });
+
+        // Keep only last 50 messages
+        if (lobby.allChatMessages.length > 50) {
+            lobby.allChatMessages.shift();
+        }
+
+        // Broadcast to all players in lobby
+        io.to(playerInfo.lobbyCode).emit('allChatMessage', {
+            username: player.username,
+            message: trimmedMessage,
+            timestamp: Date.now()
         });
     });
 
@@ -865,26 +951,165 @@ io.on('connection', (socket) => {
             if (lobby) {
                 const playerIndex = lobby.players.findIndex(p => p.socketId === socket.id);
                 if (playerIndex !== -1) {
-                    const wasHost = lobby.players[playerIndex].isHost;
-                    lobby.players.splice(playerIndex, 1);
+                    const leavingPlayer = lobby.players[playerIndex];
+                    const wasHost = leavingPlayer.isHost;
+                    const wasImposter = leavingPlayer.isImposter;
+                    const isGameActive = lobby.state === 'playing' || lobby.state === 'voting';
 
-                    if (lobby.players.length === 0) {
-                        // Delete empty lobby
-                        lobbies.delete(playerInfo.lobbyCode);
-                    } else {
-                        // Transfer host if needed
-                        if (wasHost && lobby.players.length > 0) {
-                            lobby.players[0].isHost = true;
+                    if (isGameActive) {
+                        // Mark player as left instead of removing during game
+                        leavingPlayer.hasLeft = true;
+
+                        // If imposter left, end game immediately
+                        if (wasImposter) {
+                            // Clear any timers
+                            if (lobby.turnTimer) {
+                                clearTimeout(lobby.turnTimer);
+                                lobby.turnTimer = null;
+                            }
+                            if (lobby.votingTimer) {
+                                clearTimeout(lobby.votingTimer);
+                                lobby.votingTimer = null;
+                            }
+
+                            // Regular players win
+                            lobby.players.forEach(p => {
+                                if (!p.isImposter && !p.hasLeft) {
+                                    p.score += 1;
+                                }
+                            });
+
+                            // Send game over
+                            io.to(playerInfo.lobbyCode).emit('gameOver', {
+                                imposterWon: false,
+                                imposterLeft: true,
+                                imposterUsername: leavingPlayer.username,
+                                votedOutUsername: 'Imposter left the game',
+                                card: lobby.card,
+                                players: lobby.players.filter(p => !p.hasLeft).map(p => ({
+                                    username: p.username,
+                                    isHost: p.isHost,
+                                    score: p.score,
+                                    socketId: p.socketId,
+                                    wasImposter: p.isImposter
+                                }))
+                            });
+
+                            // Reset lobby after delay
+                            setTimeout(() => {
+                                // Remove players who left
+                                lobby.players = lobby.players.filter(p => !p.hasLeft);
+                                lobby.state = 'waiting';
+                                lobby.card = null;
+                                lobby.currentTurn = null;
+                                lobby.round = 0;
+                                lobby.messages = [];
+                                lobby.votes = new Map();
+                                lobby.players.forEach(p => {
+                                    p.isImposter = false;
+                                    p.hasVoted = false;
+                                    p.isSpectator = false;
+                                });
+
+                                // Transfer host if needed
+                                if (wasHost && lobby.players.length > 0) {
+                                    lobby.players[0].isHost = true;
+                                }
+
+                                io.to(playerInfo.lobbyCode).emit('backToLobby', {
+                                    players: lobby.players.map(p => ({
+                                        username: p.username,
+                                        isHost: p.isHost,
+                                        score: p.score,
+                                        socketId: p.socketId,
+                                        isSpectator: p.isSpectator
+                                    }))
+                                });
+                            }, 8000);
+                        } else {
+                            // Regular player left during game - check if it was their turn
+                            if (lobby.currentTurn === socket.id && lobby.state === 'playing') {
+                                // Skip to next turn
+                                lobby.messages.push({
+                                    username: leavingPlayer.username,
+                                    message: '(Player left)',
+                                    round: lobby.round
+                                });
+
+                                lobby.currentTurn = getNextTurnPlayer(lobby);
+
+                                // Check if round is complete
+                                const messagesThisRound = lobby.messages.filter(m => m.round === lobby.round).length;
+                                const activePlayers = lobby.players.filter(p => !p.hasLeft);
+
+                                if (messagesThisRound === activePlayers.length) {
+                                    if (lobby.round < (lobby.totalRounds || 3)) {
+                                        lobby.round++;
+                                        const firstActivePlayer = lobby.players.find(p => !p.hasLeft);
+                                        lobby.currentTurn = firstActivePlayer ? firstActivePlayer.socketId : lobby.players[0].socketId;
+                                        startTurnTimer(lobby, playerInfo.lobbyCode);
+                                    } else {
+                                        // Start voting
+                                        lobby.state = 'voting';
+                                        io.to(playerInfo.lobbyCode).emit('votingPhase', {
+                                            players: lobby.players.filter(p => !p.hasLeft).map(p => ({
+                                                username: p.username,
+                                                socketId: p.socketId
+                                            }))
+                                        });
+
+                                        lobby.votingTimer = setTimeout(() => {
+                                            concludeVoting(lobby, playerInfo.lobbyCode);
+                                        }, 20000);
+                                    }
+                                } else {
+                                    startTurnTimer(lobby, playerInfo.lobbyCode);
+                                }
+
+                                io.to(playerInfo.lobbyCode).emit('messageReceived', {
+                                    messages: lobby.messages,
+                                    currentTurn: lobby.currentTurn,
+                                    round: lobby.round
+                                });
+                            }
+
+                            // Notify all players
+                            io.to(playerInfo.lobbyCode).emit('playerLeft', {
+                                players: lobby.players.map(p => ({
+                                    username: p.username,
+                                    isHost: p.isHost,
+                                    score: p.score,
+                                    socketId: p.socketId,
+                                    isSpectator: p.isSpectator,
+                                    hasLeft: p.hasLeft
+                                })),
+                                leftPlayerName: playerInfo.username
+                            });
                         }
+                    } else {
+                        // Game not active - remove player completely
+                        lobby.players.splice(playerIndex, 1);
 
-                        io.to(playerInfo.lobbyCode).emit('playerLeft', {
-                            players: lobby.players.map(p => ({
-                                username: p.username,
-                                isHost: p.isHost,
-                                score: p.score,
-                                socketId: p.socketId
-                            }))
-                        });
+                        if (lobby.players.length === 0) {
+                            // Delete empty lobby
+                            lobbies.delete(playerInfo.lobbyCode);
+                        } else {
+                            // Transfer host if needed
+                            if (wasHost && lobby.players.length > 0) {
+                                lobby.players[0].isHost = true;
+                            }
+
+                            io.to(playerInfo.lobbyCode).emit('playerLeft', {
+                                players: lobby.players.map(p => ({
+                                    username: p.username,
+                                    isHost: p.isHost,
+                                    score: p.score,
+                                    socketId: p.socketId,
+                                    isSpectator: p.isSpectator
+                                })),
+                                leftPlayerName: playerInfo.username
+                            });
+                        }
                     }
 
                     io.emit('lobbyList', getPublicLobbies());

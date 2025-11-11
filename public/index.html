@@ -128,7 +128,7 @@
                     <li><strong>Role Assignment:</strong> Everyone gets the same card EXCEPT the imposter, who gets a
                         different card</li>
                     <li><strong>3 Rounds of Messaging:</strong> Each player takes turns typing 1-2 words about their
-                        card (10 seconds per turn)</li>
+                        card (15 seconds per turn)</li>
                     <li><strong>Voting Phase:</strong> After all rounds, everyone votes for who they think is the
                         imposter (20 seconds)</li>
                 </ol>
@@ -206,7 +206,7 @@
                 </div>
             </div>
 
-            <!-- Right Side - Chat -->
+            <!-- Right Side - Dual Chat System -->
             <div class="game-chat">
                 <div class="game-header">
                     <h3>Round <span id="currentRound">1</span>/3</h3>
@@ -215,15 +215,37 @@
                     </div>
                 </div>
 
-                <!-- Chat Messages -->
-                <div class="chat-section">
-                    <div id="messagesList" class="messages-list"></div>
+                <!-- Guess Chat (Vertical, for guesses only) -->
+                <div class="guess-chat-section">
+                    <div class="guess-chat-header">
+                        <h4>📝 Guess Chat</h4>
+                        <p class="guess-hint">Turn-based guesses only</p>
+                    </div>
+                    <div id="guessMessagesList" class="guess-messages-list"></div>
+
+                    <!-- Guess Input (only visible on your turn) -->
+                    <div class="guess-input" id="guessInputSection" style="display: none;">
+                        <div class="your-turn-indicator">
+                            <p>🎯 YOUR TURN! Type 1-2 words about your card</p>
+                        </div>
+                        <div class="input-row">
+                            <input type="text" id="messageInput" maxlength="20" placeholder="Type 1-2 words...">
+                            <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Message Input -->
-                <div class="message-input" id="messageInputSection" style="display: none;">
-                    <input type="text" id="messageInput" maxlength="20" placeholder="Type 1-2 words about the card...">
-                    <button id="sendMessageBtn" class="btn btn-primary">Send</button>
+                <!-- All Chat (always available) -->
+                <div class="all-chat-section">
+                    <div class="all-chat-header">
+                        <h4>💬 All Chat</h4>
+                        <p class="all-chat-hint">Chat anytime!</p>
+                    </div>
+                    <div id="allChatList" class="all-chat-list"></div>
+                    <div class="all-chat-input">
+                        <input type="text" id="allChatInput" maxlength="100" placeholder="Type a message...">
+                        <button id="sendAllChatBtn" class="btn btn-secondary">Send</button>
+                    </div>
                 </div>
             </div>
         </div>
