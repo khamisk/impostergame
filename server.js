@@ -68,12 +68,6 @@ function checkAdminToken(req, res, next) {
     const token = req.get('x-admin-token') || req.query.token || '';
     const adminToken = process.env.ADMIN_TOKEN || 'default_admin_token_123';
 
-    console.log('Token check:', {
-        receivedToken: token.substring(0, 10) + '...',
-        expectedToken: adminToken.substring(0, 10) + '...',
-        match: token === adminToken
-    });
-
     if (token !== adminToken) {
         return res.status(401).json({ error: 'Unauthorized - Invalid admin token' });
     }
@@ -94,28 +88,33 @@ app.get('/admin/analytics', checkAdminToken, (req, res) => {
     const totalSessions = sessions.length;
     const avgTimeMs = totalSessions ? Math.round((analytics.totalSessionTimeMs || 0) / totalSessions) : 0;
 
-    // Calculate unique IPs
-    const uniqueIPs = new Set(sessions.map(s => s.ip)).size;
+    // Calculate unique IPs (include both completed and active sessions)
+    const allIPs = new Set([
+        ...sessions.map(s => s.ip),
+        ...Array.from(activeSessions.values()).map(s => s.ip)
+    ]);
+    const uniqueIPs = allIPs.size;
 
-    // User agent breakdown
+    // User agent breakdown (include both completed and active sessions)
+    const allSessions = [...sessions, ...Array.from(activeSessions.values())];
     const browserCounts = {};
-    sessions.forEach(s => {
+    allSessions.forEach(s => {
         const ua = s.userAgent || 'unknown';
-        const browser = ua.includes('Chrome') ? 'Chrome' :
+        const browser = ua.includes('Chrome') && !ua.includes('Edge') ? 'Chrome' :
             ua.includes('Firefox') ? 'Firefox' :
-                ua.includes('Safari') ? 'Safari' :
-                    ua.includes('Edge') ? 'Edge' : 'Other';
+                ua.includes('Safari') && !ua.includes('Chrome') ? 'Safari' :
+                    ua.includes('Edge') || ua.includes('Edg/') ? 'Edge' : 'Other';
         browserCounts[browser] = (browserCounts[browser] || 0) + 1;
     });
 
-    // Platform breakdown
+    // Platform breakdown (include both completed and active sessions)
     const platformCounts = {};
-    sessions.forEach(s => {
+    allSessions.forEach(s => {
         const ua = s.userAgent || 'unknown';
         const platform = ua.includes('Mobile') || ua.includes('Android') || ua.includes('iPhone') ? 'Mobile' :
             ua.includes('Windows') ? 'Windows' :
-                ua.includes('Mac') ? 'Mac' :
-                    ua.includes('Linux') ? 'Linux' : 'Other';
+                ua.includes('Mac') && !ua.includes('iPhone') ? 'Mac' :
+                    ua.includes('Linux') && !ua.includes('Android') ? 'Linux' : 'Other';
         platformCounts[platform] = (platformCounts[platform] || 0) + 1;
     });
 

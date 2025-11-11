@@ -436,9 +436,7 @@
 
         async function loadDashboard() {
             try {
-                document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('dashboard').classList.add('active');
-
+                // First verify the token works BEFORE showing dashboard
                 const response = await fetch('/admin/analytics', {
                     headers: { 'x-admin-token': adminToken }
                 });
@@ -448,6 +446,12 @@
                 }
 
                 const data = await response.json();
+
+                // Only show dashboard AFTER successful authentication
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('errorMessage').style.display = 'none';
+                document.getElementById('dashboard').classList.add('active');
+
                 updateStats(data);
                 updateCharts(data);
                 loadSessions();
