@@ -402,7 +402,9 @@
         // Login form
         document.getElementById('loginForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            const token = document.getElementById('tokenInput').value;
+            const token = document.getElementById('tokenInput').value.trim();
+            console.log('Token length:', token.length);
+            console.log('Token starts with:', token.substring(0, 10));
             adminToken = token;
             loadDashboard();
         });
@@ -437,15 +439,21 @@
         async function loadDashboard() {
             try {
                 // First verify the token works BEFORE showing dashboard
+                console.log('Sending token:', adminToken.substring(0, 10) + '...');
                 const response = await fetch('/admin/analytics', {
                     headers: { 'x-admin-token': adminToken }
                 });
 
+                console.log('Response status:', response.status, response.statusText);
+                
                 if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('Auth failed:', errorData);
                     throw new Error('Invalid token');
                 }
 
                 const data = await response.json();
+                console.log('Auth success! Data:', data);
 
                 // Only show dashboard AFTER successful authentication
                 document.getElementById('loginScreen').style.display = 'none';
