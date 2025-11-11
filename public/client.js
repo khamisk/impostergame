@@ -25,6 +25,31 @@ const modals = {
     joinLobby: document.getElementById('joinLobbyModal')
 };
 
+// Sound Effects
+const sounds = {
+    playerJoin: new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'), // Notification
+    playerLeave: new Audio('https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3'), // Soft pop
+    yourTurn: new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'), // Bell ding
+    gameStart: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'), // Success
+    gameOver: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3') // Complete
+};
+
+// Set volume for all sounds
+Object.values(sounds).forEach(sound => {
+    sound.volume = 0.3;
+});
+
+function playSound(soundName) {
+    try {
+        if (sounds[soundName]) {
+            sounds[soundName].currentTime = 0;
+            sounds[soundName].play().catch(err => console.log('Sound play failed:', err));
+        }
+    } catch (err) {
+        console.log('Sound error:', err);
+    }
+}
+
 // Utility Functions
 function showScreen(screenName) {
     Object.keys(screens).forEach(key => {
@@ -311,25 +336,34 @@ socket.on('lobbyJoined', ({ code, lobby }) => {
 
 socket.on('playerJoined', ({ players }) => {
     updatePlayersList(players);
+    // Update stored players for turn system
+    currentPlayers = players;
     showToast('A player joined', 'info');
+    playSound('playerJoin');
 });
 
 socket.on('playerLeft', ({ players, leftPlayerName }) => {
     updatePlayersList(players);
 
+    // Update stored players for turn system
+    currentPlayers = players;
+
     // Update game screen player list if in game
     if (currentScreen === 'gameScreen') {
         const gamePlayersList = document.getElementById('gamePlayersList');
-        gamePlayersList.innerHTML = players.map(p => `
-            <div class="game-player-item${p.hasLeft ? ' player-left' : ''}">
-                <span>${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}${p.isSpectator ? '<span class="spectator-badge">Spectator</span>' : ''}${p.hasLeft ? '<span class="left-badge">Left</span>' : ''}</span>
-                <span class="player-score">${p.score} pts</span>
-            </div>
-        `).join('');
+        if (gamePlayersList) {
+            gamePlayersList.innerHTML = players.map(p => `
+                <div class="game-player-item${p.hasLeft ? ' player-left' : ''}">
+                    <span>${p.isHost ? '👑 ' : ''}${escapeHtml(p.username)}${p.isSpectator ? '<span class="spectator-badge">Spectator</span>' : ''}${p.hasLeft ? '<span class="left-badge">Left</span>' : ''}</span>
+                    <span class="player-score">${p.score} pts</span>
+                </div>
+            `).join('');
+        }
     }
 
     if (leftPlayerName) {
         showToast(`${leftPlayerName} left the lobby`, 'info');
+        playSound('playerLeave');
 
         // Add notification to all-chat if in game
         if (currentScreen === 'gameScreen') {
@@ -399,8 +433,14 @@ socket.on('gameStarted', ({ isImposter, isSpectator, card, currentTurn, round, p
     } else {
         document.getElementById('cardDisplay').style.display = 'flex';
         document.getElementById('imposterDisplay').style.display = 'none';
-        document.getElementById('cardImage').src = `/cards/${card.image}`;
-        document.getElementById('cardName').textContent = card.name;
+        if (card && card.image && card.name) {
+            document.getElementById('cardImage').src = `/cards/${card.image}`;
+            document.getElementById('cardName').textContent = card.name;
+        } else {
+            console.error('❌ Card data is missing or invalid:', card);
+            document.getElementById('cardImage').src = '';
+            document.getElementById('cardName').textContent = 'Card data missing';
+        }
     }
 
     // Update players list
@@ -419,6 +459,7 @@ socket.on('gameStarted', ({ isImposter, isSpectator, card, currentTurn, round, p
     // Update turn
     updateTurnDisplay(currentTurn, players);
     showToast('Game started!', 'success');
+    playSound('gameStart');
 });
 
 socket.on('messageReceived', ({ messages, currentTurn, round, totalRounds }) => {
@@ -500,6 +541,7 @@ socket.on('gameOver', ({ imposterWon, imposterLeft, imposterUsername, votedOutUs
     }
     document.getElementById('votingTimer').style.display = 'none';
 
+    playSound('gameOver');
     showScreen('gameOverScreen');
 
     const gameOverContent = document.getElementById('gameOverContent');
@@ -645,6 +687,7 @@ function updateTurnDisplay(currentTurn, players) {
         turnInfo.classList.add('my-turn');
         guessInputSection.style.display = 'block';
         console.log('✅ Showing input section for my turn');
+        playSound('yourTurn');
         startTurnTimer(baseTurnText);
     } else {
         const playerName = currentPlayer ? currentPlayer.username : 'Unknown';
