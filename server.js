@@ -367,9 +367,9 @@ function startTurnTimer(lobby, lobbyCode) {
 }
 
 function getNextTurnPlayer(lobby) {
-    const currentTurnIndex = lobby.players.findIndex(p => p.socketId === lobby.currentTurn);
-    const nextIndex = (currentTurnIndex + 1) % lobby.players.length;
-    return lobby.players[nextIndex].socketId;
+    // Maintain the turn order established in the first round
+    lobby.turnOrderIndex = (lobby.turnOrderIndex + 1) % lobby.players.length;
+    return lobby.players[lobby.turnOrderIndex].socketId;
 }
 
 function concludeVoting(lobby, lobbyCode) {
@@ -662,9 +662,10 @@ io.on('connection', (socket) => {
         lobby.messages = [];
         lobby.votes = new Map();
 
-        // Random first player
+        // Random first player and establish turn order
         const randomPlayerIndex = Math.floor(Math.random() * lobby.players.length);
         lobby.currentTurn = lobby.players[randomPlayerIndex].socketId;
+        lobby.turnOrderIndex = randomPlayerIndex; // Track the starting position in turn order
 
         // Reset player states
         lobby.players.forEach(p => {
