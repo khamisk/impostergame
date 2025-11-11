@@ -445,7 +445,7 @@
                 });
 
                 console.log('Response status:', response.status, response.statusText);
-                
+
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
                     console.error('Auth failed:', errorData);
@@ -491,7 +491,7 @@
                     datasets: [{
                         data: Object.values(data.browsers),
                         backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'],
-                        borderColor: white,
+                        borderColor: '#ffffff',
                         borderWidth: 2
                     }]
                 },
@@ -512,7 +512,7 @@
                     datasets: [{
                         data: Object.values(data.platforms),
                         backgroundColor: ['#FF9800', '#2196F3', '#4CAF50', '#FF5722', '#9C27B0'],
-                        borderColor: white,
+                        borderColor: '#ffffff',
                         borderWidth: 2
                     }]
                 },
