@@ -316,9 +316,15 @@ function getRandomCard() {
 }
 
 function selectImposter(lobby) {
-    const randomIndex = Math.floor(Math.random() * lobby.players.length);
-    lobby.players.forEach((player, index) => {
-        player.isImposter = index === randomIndex;
+    // Only select from active players (not spectators, not left)
+    const activePlayers = lobby.players.filter(p => !p.isSpectator && !p.hasLeft);
+    if (activePlayers.length === 0) return;
+
+    const randomIndex = Math.floor(Math.random() * activePlayers.length);
+    const selectedImposter = activePlayers[randomIndex];
+
+    lobby.players.forEach(player => {
+        player.isImposter = player.socketId === selectedImposter.socketId;
     });
 }
 
@@ -720,18 +726,24 @@ io.on('connection', (socket) => {
         lobby.messages = [];
         lobby.votes = new Map();
 
-        // Random first player and establish turn order
-        const randomPlayerIndex = Math.floor(Math.random() * lobby.players.length);
-        lobby.currentTurn = lobby.players[randomPlayerIndex].socketId;
-        lobby.turnOrderIndex = randomPlayerIndex; // Track the starting position in turn order
-
-        // Reset player states
+        // Reset player states and clear spectator status from previous game
         lobby.players.forEach(p => {
             p.hasVoted = false;
+            // Keep spectator status only if they just joined mid-game
+            // For next game, they should be able to play
         });
 
-        // Select imposter
+        // Select imposter (only from active players)
         selectImposter(lobby);
+
+        // Random first player from active players only (not spectators, not left)
+        const activePlayers = lobby.players.filter(p => !p.isSpectator && !p.hasLeft);
+        const randomPlayerIndex = Math.floor(Math.random() * activePlayers.length);
+        const firstPlayer = activePlayers[randomPlayerIndex];
+        lobby.currentTurn = firstPlayer.socketId;
+
+        // Find the index in the full players array for turn order tracking
+        lobby.turnOrderIndex = lobby.players.findIndex(p => p.socketId === firstPlayer.socketId);
 
         // Clear any existing voting timer
         if (lobby.votingTimer) {

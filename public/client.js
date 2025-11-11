@@ -191,16 +191,27 @@ document.getElementById('sendMessageBtn').addEventListener('click', () => {
     const messageInput = document.getElementById('messageInput');
     const message = messageInput.value.trim();
 
-    console.log('🎮 Send button clicked, message:', message);
+    console.log('🎮 Send button clicked');
+    console.log('   Message:', message);
+    console.log('   Socket connected:', socket.connected);
+    console.log('   My socket ID:', mySocketId);
+    console.log('   Current lobby:', currentLobbyCode);
 
     if (!message) {
         showToast('Please enter a message', 'error');
         return;
     }
 
+    if (!socket.connected) {
+        showToast('Not connected to server', 'error');
+        console.error('❌ Socket not connected!');
+        return;
+    }
+
     console.log('📤 Emitting submitMessage:', { message });
     socket.emit('submitMessage', { message });
     messageInput.value = '';
+    console.log('✅ Message emitted, input cleared');
 });
 
 document.getElementById('messageInput').addEventListener('keypress', (e) => {
@@ -604,6 +615,13 @@ function updateTurnDisplay(currentTurn, players) {
     const isMyTurn = currentTurn === mySocketId;
     const currentPlayer = players ? players.find(p => p.socketId === currentTurn) : null;
 
+    console.log('🔄 updateTurnDisplay called:', {
+        currentTurn,
+        mySocketId,
+        isMyTurn,
+        currentPlayerName: currentPlayer?.username
+    });
+
     const turnInfo = document.getElementById('turnInfo');
     const guessInputSection = document.getElementById('guessInputSection');
 
@@ -611,12 +629,14 @@ function updateTurnDisplay(currentTurn, players) {
         const baseTurnText = '⏱️ Your turn!';
         turnInfo.classList.add('my-turn');
         guessInputSection.style.display = 'block';
+        console.log('✅ Showing input section for my turn');
         startTurnTimer(baseTurnText);
     } else {
         const playerName = currentPlayer ? currentPlayer.username : 'Unknown';
         const baseTurnText = `⏱️ ${playerName}'s turn`;
         turnInfo.classList.remove('my-turn');
         guessInputSection.style.display = 'none';
+        console.log('❌ Hiding input section, not my turn');
         startTurnTimer(baseTurnText);
     }
 }
