@@ -68,6 +68,14 @@ function checkAdminToken(req, res, next) {
     const token = req.get('x-admin-token') || req.query.token || '';
     const adminToken = process.env.ADMIN_TOKEN || 'default_admin_token_123';
 
+    console.log('=== Token Validation ===');
+    console.log('Received token length:', token.length);
+    console.log('Received token starts with:', token.substring(0, 10));
+    console.log('Expected token length:', adminToken.length);
+    console.log('Expected token starts with:', adminToken.substring(0, 10));
+    console.log('Tokens match:', token === adminToken);
+    console.log('========================');
+
     if (token !== adminToken) {
         return res.status(401).json({ error: 'Unauthorized - Invalid admin token' });
     }
@@ -906,4 +914,5 @@ function getLobbyData(lobby, socketId) {
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Admin token configured: ${process.env.ADMIN_TOKEN ? 'Yes' : 'No'}`);
 });
