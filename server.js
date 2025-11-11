@@ -514,14 +514,16 @@ function concludeVoting(lobby, lobbyCode) {
             p.hasLeft = false; // Clear any remaining hasLeft flags
         });
 
+        const backToLobbyPlayers = lobby.players.map(p => ({
+            username: p.username,
+            isHost: p.isHost,
+            score: p.score,
+            socketId: p.socketId,
+            isSpectator: p.isSpectator
+        }));
+        console.log('Emitting backToLobby. Players:', backToLobbyPlayers);
         io.to(lobbyCode).emit('backToLobby', {
-            players: lobby.players.map(p => ({
-                username: p.username,
-                isHost: p.isHost,
-                score: p.score,
-                socketId: p.socketId,
-                isSpectator: p.isSpectator
-            }))
+            players: backToLobbyPlayers
         });
     }, 8000);
 }
@@ -662,14 +664,16 @@ io.on('connection', (socket) => {
             socket.emit('lobbyJoined', { code, lobby: getLobbyData(lobby, socket.id) });
         }
 
+        const joinedPlayers = lobby.players.map(p => ({
+            username: p.username,
+            isHost: p.isHost,
+            score: p.score,
+            socketId: p.socketId,
+            isSpectator: p.isSpectator
+        }));
+        console.log('Emitting playerJoined. Players:', joinedPlayers);
         io.to(code).emit('playerJoined', {
-            players: lobby.players.map(p => ({
-                username: p.username,
-                isHost: p.isHost,
-                score: p.score,
-                socketId: p.socketId,
-                isSpectator: p.isSpectator
-            }))
+            players: joinedPlayers
         });
         io.emit('lobbyList', getPublicLobbies());
     });
@@ -1146,15 +1150,17 @@ io.on('connection', (socket) => {
                             }
 
                             // Notify all players
+                            const leftPlayers = lobby.players.map(p => ({
+                                username: p.username,
+                                isHost: p.isHost,
+                                score: p.score,
+                                socketId: p.socketId,
+                                isSpectator: p.isSpectator,
+                                hasLeft: p.hasLeft
+                            }));
+                            console.log('Emitting playerLeft (during game). Players:', leftPlayers, 'Left player:', playerInfo.username);
                             io.to(playerInfo.lobbyCode).emit('playerLeft', {
-                                players: lobby.players.map(p => ({
-                                    username: p.username,
-                                    isHost: p.isHost,
-                                    score: p.score,
-                                    socketId: p.socketId,
-                                    isSpectator: p.isSpectator,
-                                    hasLeft: p.hasLeft
-                                })),
+                                players: leftPlayers,
                                 leftPlayerName: playerInfo.username
                             });
                         }
@@ -1171,14 +1177,16 @@ io.on('connection', (socket) => {
                                 lobby.players[0].isHost = true;
                             }
 
+                            const leftPlayersNoGame = lobby.players.map(p => ({
+                                username: p.username,
+                                isHost: p.isHost,
+                                score: p.score,
+                                socketId: p.socketId,
+                                isSpectator: p.isSpectator
+                            }));
+                            console.log('Emitting playerLeft (not in game). Players:', leftPlayersNoGame, 'Left player:', playerInfo.username);
                             io.to(playerInfo.lobbyCode).emit('playerLeft', {
-                                players: lobby.players.map(p => ({
-                                    username: p.username,
-                                    isHost: p.isHost,
-                                    score: p.score,
-                                    socketId: p.socketId,
-                                    isSpectator: p.isSpectator
-                                })),
+                                players: leftPlayersNoGame,
                                 leftPlayerName: playerInfo.username
                             });
                         }

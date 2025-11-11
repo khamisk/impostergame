@@ -345,6 +345,7 @@ socket.on('lobbyJoined', ({ code, lobby }) => {
 });
 
 socket.on('playerJoined', ({ players }) => {
+    console.log('playerJoined event. Players:', players);
     updatePlayersList(players);
     // Update stored players for turn system
     currentPlayers = players;
@@ -353,6 +354,7 @@ socket.on('playerJoined', ({ players }) => {
 });
 
 socket.on('playerLeft', ({ players, leftPlayerName }) => {
+    console.log('playerLeft event. Players:', players, 'Left player:', leftPlayerName);
     updatePlayersList(players);
 
     // Update stored players for turn system
@@ -591,6 +593,7 @@ socket.on('gameOver', ({ imposterWon, imposterLeft, imposterUsername, votedOutUs
 });
 
 socket.on('backToLobby', ({ players }) => {
+    console.log('backToLobby received. Players:', players);
     // Reset voting state
     isVotingPhase = false;
     votingTimeLeft = 20;
@@ -613,6 +616,7 @@ function updateLobbyScreen(lobby) {
 }
 
 function updatePlayersList(players) {
+    console.log('updatePlayersList called with:', players);
     const playersList = document.getElementById('playersList');
     const playerCount = document.getElementById('playerCount');
 
@@ -635,6 +639,7 @@ function updatePlayersList(players) {
             </div>
         `;
     }).join('');
+    console.log('Player list HTML updated. Count:', players.length);
 
     // Show start button only for host
     const startGameBtn = document.getElementById('startGameBtn');
