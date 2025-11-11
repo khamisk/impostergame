@@ -34,14 +34,24 @@ const sounds = {
     gameOver: new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3') // Complete
 };
 
-// Set volume for all sounds
+// Set volume for all sounds (lower volume)
 Object.values(sounds).forEach(sound => {
-    sound.volume = 0.3;
+    sound.volume = 0.15;
 });
 
+// Debounce sound playing to prevent spam
+let lastSoundPlayed = {};
 function playSound(soundName) {
     try {
         if (sounds[soundName]) {
+            // Prevent playing same sound multiple times within 500ms
+            const now = Date.now();
+            if (lastSoundPlayed[soundName] && (now - lastSoundPlayed[soundName]) < 500) {
+                console.log('Sound debounced:', soundName);
+                return;
+            }
+            lastSoundPlayed[soundName] = now;
+
             sounds[soundName].currentTime = 0;
             sounds[soundName].play().catch(err => console.log('Sound play failed:', err));
         }
